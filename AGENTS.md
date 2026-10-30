@@ -127,9 +127,17 @@ from other directories. Bundles require the preload too (see README).
   inherit defaults, arrays replace shortcuts, and `[]` disables them. Contexts
   permit key reuse only where actions cannot overlap. Keep handlers and hints
   sourced from `src/keybindings.ts`; inline hints use the first alternative and
-  palette details show all alternatives. No leader sequences. Consume handled
+  palette details show all alternatives. The global `leader` defaults to `ctrl+x`;
+  symbolic `leader p` sequences resolve against it, while literal `ctrl+x p`
+  sequences remain unchanged. Validate conflicts after leader expansion using
+  the combined configuration. Two-key sequences
+  use a context-scoped prefix: show a pending hint, consume the next key, cancel
+  with Escape or a two-second timeout. Prefixes cannot also be single keys in
+  the same context. Sequences are supported for centrally routed application
+  commands; widgets and immediate global actions use single keys. Consume handled
   keys before other handlers/widgets; suppress managed OpenTUI editor defaults
   with `src/ui/keybindings.ts` so disabled/remapped keys cannot fall through.
+  Ctrl+P/N mirror Up/Down, including visual composer movement before input history.
   Confirmation/submission/toggle actions ignore repeat events; navigation repeats.
   Help is a separate keyboard context. While open, keep underlying pickers/forms
   mounted but inactive so drafts, selection, and cursor position survive. Only
@@ -157,7 +165,7 @@ Implemented: stdio agents, streaming Markdown, tool cards/diffs, client file and
 terminal services, permissions, form/URL elicitation, cancellation, local session
 history and advertised resumption, file attachments, dynamic agent commands and
 configuration, configurable keybindings, themes, sidebar, export and offline demo.
-**Choose theme**, `/tui:theme`, and the unbound-by-default `app.theme` open a
+**Choose theme**, `/tui:theme`, and the default `ctrl+x t` (`app.theme`) open a
 searchable picker for built-in and custom themes. Built-ins include Dark/Light,
 Gruvbox Dark/Light, all four Catppuccin flavors, GitHub Dark/Light, Dracula, Nord,
 and Tokyo Night. Theme switching preserves drafts, focus and timeline IDs;

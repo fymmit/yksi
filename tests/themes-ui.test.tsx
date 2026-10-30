@@ -87,7 +87,8 @@ test("theme picker applies custom UI, syntax, Markdown and diff colors to existi
     { width: 110, height: 50, kittyKeyboard: true },
   );
   try {
-    setup.mockInput.pressKey("o", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("o");
     await waitFor(setup, () => setup.captureCharFrame().includes("Theme heading"));
     await setup.mockInput.typeText("keep this draft");
     const editor = descendants(setup.renderer.root).find(

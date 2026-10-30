@@ -252,6 +252,17 @@ export function FormView(props: {
       if (consumeKey(key)) toggleMode();
       return;
     }
+    if (
+      (json() || (form.fields[index()] && !questionChoices(form.fields[index()]!).length)) &&
+      (keys.matches("form.cursorUp", key) || keys.matches("form.cursorDown", key))
+    ) {
+      if (consumeKey(key, true)) {
+        const editor = json() ? jsonEditor : activeEditor?.editor;
+        if (keys.matches("form.cursorUp", key)) editor?.moveCursorUp();
+        else editor?.moveCursorDown();
+      }
+      return;
+    }
     if (json()) {
       if (keys.matches("form.submitJson", key)) {
         if (consumeKey(key)) submitJson();

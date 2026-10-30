@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { z } from "zod";
-import { keybindingsSchema } from "./keybindings";
+import { defaultLeader, keybindingsSchema, parseKey, resolveKeybindings } from "./keybindings";
 import { themeSettingsSchema, validateThemeSettings } from "./themes";
 
 const agentSchema = z.object({
@@ -13,13 +13,27 @@ const agentSchema = z.object({
 export const configSchema = z
   .object({
     ...themeSettingsSchema.shape,
+    leader: z.string().default(defaultLeader),
     keybindings: keybindingsSchema.optional(),
     defaultAgent: z.string().default("copilot"),
     agents: z.record(z.string(), agentSchema).default({
       copilot: { command: "copilot", args: ["--acp", "--stdio"], env: {} },
     }),
   })
-  .superRefine(validateThemeSettings);
+  .superRefine((config, ctx) => {
+    validateThemeSettings(config, ctx);
+    try {
+      parseKey(config.leader);
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["leader"], message: (error as Error).message });
+      return;
+    }
+    try {
+      resolveKeybindings(config.keybindings, config.leader);
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["keybindings"], message: (error as Error).message });
+    }
+  });
 export type AgentDefinition = z.infer<typeof agentSchema>;
 export type Config = z.infer<typeof configSchema>;
 

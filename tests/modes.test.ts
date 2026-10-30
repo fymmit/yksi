@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { Controller } from "../src/controller";
-import { demoAgent } from "../src/config";
+import { configSchema, demoAgent } from "../src/config";
 import { sessionMode } from "../src/modes";
 import { Storage } from "../src/storage";
 import { newSession } from "../src/state";
@@ -14,7 +14,7 @@ function setup(env: Record<string, string> = {}) {
     env,
   };
   const controller = new Controller(
-    { defaultAgent: "test", agents: { test: agent } },
+    configSchema.parse({ defaultAgent: "test", agents: { test: agent } }),
     storage,
     resolve(import.meta.dir, ".."),
     "test",

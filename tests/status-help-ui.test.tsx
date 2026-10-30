@@ -142,7 +142,8 @@ test("compact status summarizes sidebar data, adapts to width and preserves the 
     expect(setup.footer()).toContain("Cost: EUR 0.50");
     expect(setup.footer()).toContain("Mode: On");
     expect(setup.captureCharFrame()).toContain("Reported diffs");
-    setup.mockInput.pressKey("b", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("b");
     setup.resize(180, 35);
     await setup.renderOnce();
     expect(setup.captureCharFrame()).not.toContain("Reported diffs");
@@ -430,7 +431,8 @@ test("unbound help remains available in the palette and as a local slash command
   const setup = await renderApp({ "app.help": [] });
   try {
     expect(setup.footer()).toEndWith("Help (unbound)");
-    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
     await setup.mockInput.typeText("Keyboard shortcuts");
     setup.mockInput.pressEnter();
     await setup.renderOnce();
@@ -450,7 +452,8 @@ test("help preserves picker filtering, selection and focus", async () => {
   const setup = await renderApp();
   try {
     await setup.mockInput.typeText("draft");
-    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
     await setup.mockInput.typeText("Show");
     setup.mockInput.pressArrow("down"); // Reasoning after session usage.
     setup.mockInput.pressKey("F1");

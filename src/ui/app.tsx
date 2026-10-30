@@ -8,7 +8,14 @@ import { changedFiles, type Message } from "../state";
 import { sessionMode } from "../modes";
 import { projectFiles } from "../files";
 import { appPaths } from "../config";
-import { resolveKeybindings, type KeyAction, type KeyContext } from "../keybindings";
+import {
+  formatKey,
+  matchesKey,
+  resolveKeybindings,
+  type KeyAction,
+  type KeyContext,
+  type KeyStroke,
+} from "../keybindings";
 import { consumeKey, suppressEditorFallback } from "./keybindings";
 import { syntaxStyle, editorColors, scrollbarColors, selectionColors } from "./theme";
 import { initialTheme, resolveThemes } from "../themes";
@@ -21,7 +28,7 @@ import { KeyboardHelp } from "./help";
 
 export function App(props: { controller: Controller; quit: () => void; autoConnect?: boolean }) {
   const controller = props.controller;
-  const keys = resolveKeybindings(controller.config.keybindings);
+  const keys = resolveKeybindings(controller.config.keybindings, controller.config.leader);
   const hint = keys.hint;
   const renderer = useRenderer();
   const dimensions = useTerminalDimensions();
@@ -47,16 +54,22 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const [palette, setPalette] = createSignal<{ title: string; choices: Choice[] }>();
   const [help, setHelp] = createSignal<KeyContext>();
   const [formContext, setFormContext] = createSignal<KeyContext>("form.text");
-  const showHelp = () =>
-    setHelp(
-      state.interaction
-        ? state.interaction.form
-          ? formContext()
-          : "permission"
-        : palette()
-          ? "picker"
-          : "composer",
-    );
+  const [prefix, setPrefix] = createSignal<{ key: KeyStroke; context: KeyContext }>();
+  let prefixTimer: ReturnType<typeof setTimeout> | undefined;
+  const clearPrefix = () => {
+    if (prefixTimer) clearTimeout(prefixTimer);
+    prefixTimer = undefined;
+    setPrefix(undefined);
+  };
+  const context = (): KeyContext =>
+    state.interaction
+      ? state.interaction.form
+        ? formContext()
+        : "permission"
+      : palette()
+        ? "picker"
+        : "composer";
+  const showHelp = () => setHelp(context());
   const [notice, setNotice] = createSignal("");
   let editor: TextareaRenderable | undefined;
   let scroll: ScrollBoxRenderable | undefined;
@@ -82,6 +95,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const listener = (snapshot: Snapshot) => {
     const previousId = state.session.id;
     if (previousId !== snapshot.session.id) {
+      clearPrefix();
       setNotice("");
       drafts.set(
         previousId,
@@ -93,7 +107,10 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       historyIndex = -1;
       setLimit(200);
     }
-    if (snapshot.interaction) setPalette(undefined);
+    if (snapshot.interaction) {
+      clearPrefix();
+      setPalette(undefined);
+    }
     setState(reconcile(snapshot));
   };
   onMount(() => {
@@ -101,6 +118,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     if (props.autoConnect !== false) run(() => controller.open());
   });
   onCleanup(() => {
+    clearPrefix();
     controller.off("change", listener);
     for (const style of styles.values()) style.destroy();
   });
@@ -341,24 +359,53 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     run(() => controller.send(text, files));
   };
 
+  const runAppAction = (id: KeyAction) => {
+    if (id === "app.commands") showCommands();
+    else if (id === "app.tools") setExpanded(value => !value);
+    else {
+      const command = clientCommands().find(command => `app.${command.id}` === id);
+      if (command) run(command.run);
+    }
+  };
+
   useKeyboard(key => {
     if (key.defaultPrevented) return;
     if (keys.matches("app.quit", key) || keys.matches("app.interrupt", key)) {
       if (!consumeKey(key)) return;
+      clearPrefix();
       if (keys.matches("app.interrupt", key) && busy()) run(() => controller.cancel());
       else props.quit();
       return;
     }
     if (keys.matches("app.help", key)) {
       if (consumeKey(key)) {
+        clearPrefix();
         if (help()) setHelp(undefined);
         else showHelp();
       }
       return;
     }
     if (help()) return;
+    const pending = prefix();
+    if (pending) {
+      if (!consumeKey(key)) return;
+      clearPrefix();
+      if (matchesKey(key, { name: "escape" }) || keys.matches("app.cancel", key)) return;
+      if (pending.context === context()) {
+        const id = keys.sequence(pending.context, pending.key, key);
+        if (id) runAppAction(id);
+      }
+      return;
+    }
+    if (keys.starts(context(), key)) {
+      if (consumeKey(key)) {
+        setPrefix({ key, context: context() });
+        prefixTimer = setTimeout(clearPrefix, 2000);
+      }
+      return;
+    }
     if (keys.matches("app.tools", key)) {
-      if (consumeKey(key)) setExpanded(value => !value);
+      if (consumeKey(key)) runAppAction("app.tools");
       return;
     }
     if (
@@ -381,7 +428,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     }
     if (palette()) return;
     if (keys.matches("app.commands", key)) {
-      if (consumeKey(key)) showCommands();
+      if (consumeKey(key)) runAppAction("app.commands");
       return;
     }
     const command = clientCommands().find(command => {
@@ -428,14 +475,22 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       const view = editor?.editorView;
       const visualRow = cursor && view ? cursor.visualRow + view.getViewport().offsetY : 0;
       const lastRow = (view?.getTotalVirtualLineCount() ?? 1) - 1;
-      if (previous ? visualRow > 0 : visualRow < lastRow) return;
+      if (previous ? visualRow > 0 : visualRow < lastRow) {
+        // Arrows are native editor keys; other bindings need the same visual movement.
+        if (key.name !== (previous ? "up" : "down") && consumeKey(key, true))
+          previous ? editor?.moveCursorUp() : editor?.moveCursorDown();
+        return;
+      }
       const history =
         state.session.inputHistory ??
         state.session.items
           .filter((item): item is Message => item.type === "message" && item.role === "user")
           .map(item => ({ text: item.text, attachments: [] as string[] }));
       const next = Math.max(-1, Math.min(history.length - 1, historyIndex + (previous ? 1 : -1)));
-      if (next === historyIndex) return;
+      if (next === historyIndex) {
+        if (key.name !== (previous ? "up" : "down")) consumeKey(key, true);
+        return;
+      }
       if (!consumeKey(key, true)) return;
       if (historyIndex === -1)
         savedDraft = { text: editor?.plainText ?? draft(), attachments: attachments() };
@@ -464,7 +519,9 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           {state.session.title}
         </text>
         <text {...selectionColors(theme())} fg={theme().muted}>
-          {state.agentName ?? state.session.agent} · {state.status}
+          {prefix()
+            ? `${formatKey(prefix()!.key)} …`
+            : `${state.agentName ?? state.session.agent} · ${state.status}`}
         </text>
       </box>
       <box flexGrow={1} minHeight={0} flexDirection="row">

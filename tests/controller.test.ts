@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { Controller, type Snapshot } from "../src/controller";
-import { demoAgent } from "../src/config";
+import { configSchema, demoAgent } from "../src/config";
 import { Storage } from "../src/storage";
 import { addMessage } from "../src/state";
 import type { ClientEvents } from "../src/acp/client";
@@ -11,7 +11,7 @@ function setup() {
   const definition = demoAgent();
   definition.env.ACP_DEMO_FAST = "1";
   const controller = new Controller(
-    { defaultAgent: "demo", agents: { demo: definition } },
+    configSchema.parse({ defaultAgent: "demo", agents: { demo: definition } }),
     storage,
     resolve(import.meta.dir, ".."),
     "demo",

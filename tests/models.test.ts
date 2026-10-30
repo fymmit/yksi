@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Controller, type Snapshot } from "../src/controller";
-import { demoAgent } from "../src/config";
+import { configSchema, demoAgent } from "../src/config";
 import { Storage } from "../src/storage";
 
 function setup(
@@ -18,7 +18,7 @@ function setup(
     env,
   };
   const controller = new Controller(
-    { defaultAgent: "test", agents: { test: agent, second: agent } },
+    configSchema.parse({ defaultAgent: "test", agents: { test: agent, second: agent } }),
     storage,
     cwd,
     "test",

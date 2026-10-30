@@ -32,7 +32,8 @@ test("keyboard palette preserves the draft, filters and closes; narrow layout ke
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("What would you like to build?");
     await setup.mockInput.typeText("Keep this draft");
-    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Command palette");
     await setup.mockInput.typeText("Choose theme");
@@ -85,7 +86,8 @@ test("reactive streaming and expanded diffs render after initial mount", async (
       content: { type: "text", text: " and second chunk." },
     });
     controller.emit("change", controller.snapshot());
-    setup.mockInput.pressKey("o", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("o");
     await waitForWorkerFrame(
       setup,
       frame => frame.includes("goodbye") && frame.includes("First chunk and second chunk."),
@@ -168,7 +170,8 @@ test("chat cards align by speaker with timestamps while tools and notices stay b
         .indexOf("Assistant ·"),
     );
 
-    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
     await setup.renderOnce();
     await setup.mockInput.typeText("Show / hide reasoning");
     setup.mockInput.pressEnter();
@@ -286,7 +289,8 @@ test("usage palette preserves the draft at narrow widths and the slash command r
   try {
     await setup.renderOnce();
     await setup.mockInput.typeText("Keep this draft");
-    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
     await setup.renderOnce();
     await setup.mockInput.typeText("Show session usage");
     await setup.renderOnce();
@@ -352,7 +356,7 @@ test("offline demo form accepts keyboard answers without consuming the composer 
   const definition = demoAgent();
   definition.env.ACP_DEMO_FAST = "1";
   const controller = new Controller(
-    { defaultAgent: "demo", agents: { demo: definition } },
+    configSchema.parse({ defaultAgent: "demo", agents: { demo: definition } }),
     storage,
     resolve(import.meta.dir, ".."),
     "demo",
@@ -409,7 +413,7 @@ test("queued forms reset values and errors while keeping the composer isolated",
   const definition = demoAgent();
   definition.args = [resolve(import.meta.dir, "fixtures/agent.ts")];
   const controller = new Controller(
-    { defaultAgent: "demo", agents: { demo: definition } },
+    configSchema.parse({ defaultAgent: "demo", agents: { demo: definition } }),
     storage,
     resolve(import.meta.dir, ".."),
     "demo",

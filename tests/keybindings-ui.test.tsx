@@ -11,10 +11,10 @@ import { resolveKeybindings, type KeyOverrides } from "../src/keybindings";
 import type { FormContent } from "../src/ui/form-state";
 import { addMessage, newSession } from "../src/state";
 
-async function renderApp(keybindings: KeyOverrides) {
+async function renderApp(keybindings: KeyOverrides, leader = "ctrl+x") {
   const storage = new Storage(":memory:");
   const controller = new Controller(
-    configSchema.parse({ keybindings }),
+    configSchema.parse({ keybindings, leader }),
     storage,
     "/project",
     "copilot",
@@ -76,6 +76,127 @@ function installModes(controller: Controller) {
   return changes;
 }
 
+test("Ctrl+X sequences open commands and theme without editing the composer", async () => {
+  const setup = await renderApp({});
+  try {
+    await setup.mockInput.typeText("unsent draft");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Ctrl+X …");
+    setup.mockInput.pressKey("ESCAPE");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("Ctrl+X …");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("z"); // Unknown second keys are consumed, not typed.
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("unsent draft");
+    expect(setup.captureCharFrame()).not.toContain("unsent draftz");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("t");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Choose theme");
+    setup.mockInput.pressKey("ESCAPE");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Command palette");
+    expect(setup.captureCharFrame()).toContain("unsent draft");
+    expect(setup.captureCharFrame()).toContain("Ctrl+X N");
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("custom leader updates command routing and visible hints; literal sequences stay independent", async () => {
+  const setup = await renderApp({ "app.theme": ["ctrl+x t"] }, "ctrl+g");
+  try {
+    expect(setup.captureCharFrame()).toContain("Ctrl+G P commands");
+    setup.mockInput.pressKey("F1");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Ctrl+G P");
+    expect(setup.captureCharFrame()).not.toContain("Leader P");
+    setup.mockInput.pressKey("F1");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("Command palette");
+    setup.mockInput.pressKey("g", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Ctrl+G …");
+    setup.mockInput.pressKey("p");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Command palette");
+    setup.mockInput.pressKey("ESCAPE");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("t");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Choose theme");
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("Ctrl+P/N navigate visual composer rows before input history", async () => {
+  const setup = await renderApp({});
+  try {
+    setup.controller.recordInput("recalled entry");
+    setup.resize(38, 22);
+    await setup.renderOnce();
+    await setup.mockInput.typeText("a long line that wraps around the narrow composer");
+    setup.mockInput.pressEnter({ shift: true });
+    await setup.mockInput.typeText("last line");
+    setup.mockInput.pressKey("p", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("recalled entry");
+    setup.mockInput.pressKey("n", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("last line");
+    for (let i = 0; i < 6 && !setup.captureCharFrame().includes("recalled entry"); i++) {
+      setup.mockInput.pressKey("p", { ctrl: true });
+      await setup.renderOnce();
+    }
+    expect(setup.captureCharFrame()).toContain("recalled entry");
+    setup.mockInput.pressKey("n", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("last line");
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("prefixes expire and are scoped to active contexts; Ctrl+P/N navigate pickers", async () => {
+  const setup = await renderApp({});
+  try {
+    setup.mockInput.pressKey("x", { ctrl: true });
+    await Bun.sleep(2100);
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("Ctrl+X …");
+    setup.mockInput.pressKey("p");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("Command palette");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Command palette");
+    setup.mockInput.pressKey("n", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("› New session");
+    setup.mockInput.pressKey("p", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("› Keyboard shortcuts");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p"); // Palette-only sequence cannot reopen inside a picker.
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Command palette");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("o"); // Tool details are available in pickers.
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Command palette");
+  } finally {
+    await setup.cleanup();
+  }
+});
+
 test("Shift+Tab cycles modes without changing drafts, ignores repeat/release events, and shows narrow-terminal feedback", async () => {
   const setup = await renderApp({});
   const changes = installModes(setup.controller);
@@ -123,7 +244,8 @@ test("cycle-mode remaps and disabling retain palette access and shortcut labels"
         await setup.renderOnce();
         expect(changes).toEqual(["plan"]);
       }
-      setup.mockInput.pressKey("p", { ctrl: true });
+      setup.mockInput.pressKey("x", { ctrl: true });
+      setup.mockInput.pressKey("p");
       await setup.mockInput.typeText("Cycle mode");
       await setup.renderOnce();
       expect(setup.captureCharFrame()).toContain("Cycle mode");
@@ -141,7 +263,8 @@ test("mode cycling is scoped to the composer and is available as a client comman
   const setup = await renderApp({});
   const changes = installModes(setup.controller);
   try {
-    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
     setup.mockInput.pressKey("TAB", { shift: true });
     expect(changes).toEqual([]);
     setup.mockInput.pressKey("ESCAPE");
@@ -202,7 +325,8 @@ test("config mode feedback follows replacement snapshots and settings omit dupli
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Mode: Plan · Shift+Tab cycle mode");
     expect(setup.captureCharFrame()).not.toContain("Mode: legacy");
-    setup.mockInput.pressKey("m", { ctrl: true });
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("m");
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Agent session settings");
     expect(setup.captureCharFrame()).not.toContain("Legacy mode");
@@ -519,6 +643,87 @@ test("form remaps text controls, confirmation and checkboxes while preserving an
     setup.mockInput.pressKey("x", { meta: true });
     setup.mockInput.pressKey("y", { meta: true });
     expect(answers).toEqual([{ id: "accept", content: { name: "abZc", extras: ["docs"] } }]);
+  } finally {
+    await setup.dispose();
+  }
+});
+
+test("Ctrl+P/N navigate multiline form answers and choice options", async () => {
+  const answers: { id?: string; content?: FormContent }[] = [];
+  const setup = await testRender(
+    () => (
+      <InteractionView
+        theme={themes.dark}
+        interaction={{
+          id: "form",
+          title: "Questions",
+          options: [],
+          form: {
+            properties: {
+              name: { type: "string", title: "Name" },
+              choice: { type: "string", title: "Choice", enum: ["first", "second"] },
+            },
+            required: ["name", "choice"],
+          },
+        }}
+        answer={(id, content) => answers.push({ id, content })}
+      />
+    ),
+    { width: 80, height: 30, kittyKeyboard: true },
+  );
+  try {
+    await setup.renderOnce();
+    await setup.mockInput.typeText("first");
+    setup.mockInput.pressEnter({ shift: true });
+    await setup.mockInput.typeText("second");
+    setup.mockInput.pressKey("p", { ctrl: true });
+    await setup.mockInput.typeText("!");
+    setup.mockInput.pressKey("n", { ctrl: true });
+    await setup.mockInput.typeText("?");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Choice");
+    setup.mockInput.pressKey("n", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("> second");
+    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressKey("n", { ctrl: true });
+    setup.mockInput.pressEnter();
+    expect(answers).toEqual([
+      { id: "accept", content: { name: "first!\nsecond?", choice: "second" } },
+    ]);
+  } finally {
+    await setup.dispose();
+  }
+});
+
+test("Ctrl+P/N select permission options", async () => {
+  const answers: (string | undefined)[] = [];
+  const setup = await testRender(
+    () => (
+      <InteractionView
+        theme={themes.dark}
+        interaction={{
+          id: "permission",
+          title: "Allow?",
+          options: [
+            { id: "no", name: "No" },
+            { id: "yes", name: "Yes" },
+          ],
+        }}
+        answer={id => answers.push(id)}
+      />
+    ),
+    { width: 80, height: 20, kittyKeyboard: true },
+  );
+  try {
+    await setup.renderOnce();
+    setup.mockInput.pressKey("n", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("› Yes");
+    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressEnter();
+    expect(answers).toEqual(["no"]);
   } finally {
     await setup.dispose();
   }
