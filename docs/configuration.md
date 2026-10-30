@@ -7,9 +7,13 @@ project-local configuration is not loaded implicitly. For a full example, see
 
 ## Agents
 
-The built-in default launches `copilot --acp --stdio`; install and sign in to
-Copilot CLI first if you use it. Other installed ACP agents can be configured
-with the command and arguments documented by the agent:
+The built-in default launches `opencode acp`; install
+[OpenCode](https://opencode.ai/v2/docs/) first. OpenCode offers free models,
+though availability, authentication, and costs depend on the model/provider you
+choose. The optional built-in Copilot agent launches `copilot --acp --stdio`;
+install and sign in to Copilot CLI before using `--agent copilot`. Other installed
+ACP agents can be configured with the command and arguments documented by the
+agent:
 
 ```json
 {
@@ -25,9 +29,11 @@ with the command and arguments documented by the agent:
 ```
 
 Replace the placeholder command and arguments before running. When specifying
-`agents`, include every agent you intend to use: the built-in Copilot definition
-is not merged into your custom list. `defaultAgent` must name one of your agents;
-it defaults to `copilot` if omitted. `args` and `env` default to empty. Arguments
+`agents`, include every agent you intend to use: the built-in OpenCode and Copilot
+definitions are not merged into your custom list. `defaultAgent` must name one of
+your agents; it defaults to `opencode` if omitted. If you replace `agents` without
+an `opencode` entry, set `defaultAgent` to an agent you included. `args` and `env`
+default to empty. Arguments
 are passed directly, without a shell. The agent inherits your environment;
 `env` adds or overrides individual variables. Agents run with your user
 privileges. The client presents permission decisions requested by the agent;
@@ -42,6 +48,38 @@ yksi --help
 
 The equivalent source-checkout invocation is
 `bun run start -- /path/to/project --agent my-agent`.
+
+### Other ACP agents
+
+These are examples of local stdio agents; install and authenticate them according
+to their linked documentation. They are **not** bundled with yksi. Provider
+subscriptions, free tiers, and model availability vary.
+
+| Agent                                                                                           | Command            | Arguments              | Setup                                                                                         |
+| ----------------------------------------------------------------------------------------------- | ------------------ | ---------------------- | --------------------------------------------------------------------------------------------- |
+| [OpenCode](https://opencode.ai/v2/docs/cli/acp/) (default)                                      | `opencode`         | `["acp"]`              | Install OpenCode; select a model.                                                             |
+| [Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli) (built in) | `copilot`          | `["--acp", "--stdio"]` | Install Copilot CLI and sign in.                                                              |
+| [Gemini CLI](https://geminicli.com/docs/cli/acp-mode/)                                          | `gemini`           | `["--acp"]`            | Install Gemini CLI and set up its authentication.                                             |
+| [Claude Agent](https://github.com/agentclientprotocol/claude-agent-acp)                         | `claude-agent-acp` | `[]`                   | Install the `@agentclientprotocol/claude-agent-acp` adapter and configure Claude credentials. |
+| [Codex](https://github.com/agentclientprotocol/codex-acp)                                       | `codex-acp`        | `[]`                   | Install the `@agentclientprotocol/codex-acp` adapter and configure Codex authentication.      |
+
+For example, after installing Gemini CLI, add it alongside the built-in choices
+in your global configuration (custom `agents` replaces the entire built-in list):
+
+```json
+{
+  "defaultAgent": "opencode",
+  "agents": {
+    "opencode": { "command": "opencode", "args": ["acp"] },
+    "copilot": { "command": "copilot", "args": ["--acp", "--stdio"] },
+    "gemini": { "command": "gemini", "args": ["--acp"] }
+  }
+}
+```
+
+Run `yksi --agent gemini` to use that agent. To add Claude Agent or Codex,
+install the linked adapter and add an entry using its command from the table.
+The `claude` and `codex` CLIs alone are not ACP commands; use their adapters.
 
 ## Themes
 

@@ -28,7 +28,7 @@ async function main() {
 
 Usage: yksi [directory] [options]
 
-  --agent, -a NAME  Select a configured ACP agent (default: copilot)
+  --agent, -a NAME  Select a configured ACP agent (default: opencode)
   --demo           Use the offline demonstration agent
   --config PATH    Read an explicit configuration file
   --cwd PATH       Set the project directory
@@ -38,7 +38,8 @@ Usage: yksi [directory] [options]
 Configuration: ${appPaths().config}
 Data:          ${appPaths().data}
 
-Copilot: install Copilot CLI and sign in using its CLI before connecting.
+OpenCode: install the OpenCode CLI; choose an available model in OpenCode.
+Copilot CLI is also built in; install and sign in to use --agent copilot.
 Default keyboard: ${defaultKeybindings.hint("app.commands", "commands")} · ${defaultKeybindings.hint("app.sessions", "sessions")} · ${defaultKeybindings.hint("app.agents", "agents")} · ${defaultKeybindings.hint("app.cancel", "cancel")}
 Customize shortcuts with keybindings in your configuration file.`);
     return;

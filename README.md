@@ -16,9 +16,11 @@ bun install --frozen-lockfile
 bun run demo
 ```
 
-The demo works offline, with no model account or file changes. To use the built-in
-Copilot CLI default, install [Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
-and sign in with its CLI, then run:
+The demo works offline, with no model account or file changes. To use the default
+agent, install [OpenCode](https://opencode.ai/v2/docs/). It runs over ACP with
+`opencode acp`; select an available model in OpenCode. OpenCode offers free models,
+so a paid subscription is not required, though model availability and any
+authentication requirements may change. Then run:
 
 ```sh
 bun run start                     # current directory
@@ -49,9 +51,15 @@ Replace the example command and arguments with those documented by your ACP
 agent. Sign in using its own CLI if needed. You can define multiple agents and
 select one with `bun run start -- --agent NAME` (or `yksi --agent NAME` after
 linking). Use `--config /path/to/config.json` for a different configuration file.
-No configuration file is needed for the Copilot CLI default. See the
+No configuration file is needed for the OpenCode default. Copilot CLI is also
+built in: install and sign in to [Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli),
+then run `bun run start -- --agent copilot`. Other ACP agents, including
+[Gemini CLI](https://geminicli.com/docs/cli/acp-mode/),
+[Claude Agent](https://github.com/agentclientprotocol/claude-agent-acp), and
+[Codex](https://github.com/agentclientprotocol/codex-acp), can be configured
+after installation; Claude Agent and Codex require separate ACP adapters. See the
 [configuration guide](docs/configuration.md) for environment variables, themes,
-and keybindings.
+keybindings, and example agent commands.
 
 ## Basics
 

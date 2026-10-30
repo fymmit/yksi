@@ -5,7 +5,8 @@
 yksi (Finnish for "one") is an agent-agnostic, keyboard-first terminal client for
 AI coding agents using the **Agent Client Protocol (ACP)**. The desired UX follows OpenCode's interaction flow
 (conversation, composer, palette, sessions, tool details and permissions), with
-its own visual design. Copilot CLI is the first real integration. Agent behavior
+its own visual design. OpenCode is the default agent (`opencode acp`); Copilot CLI
+remains an optional built-in choice. Agent behavior
 belongs to the external ACP process; this application owns the user interface
 and client-side filesystem/terminal services.
 
@@ -19,9 +20,9 @@ and client-side filesystem/terminal services.
 
 ```sh
 bun install --frozen-lockfile
-bun run start                 # Copilot in the current project
+bun run start                 # OpenCode in the current project
 bun run demo                  # offline ACP demonstration
-bun run start -- /path/to/project --agent copilot
+bun run start -- /path/to/project --agent copilot  # optional built-in agent
 bun run format                # Biome formatting pass
 bun run format:check          # read-only formatting check (also enforced in CI)
 bun run check                 # strict type-check + tests

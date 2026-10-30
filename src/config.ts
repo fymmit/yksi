@@ -15,8 +15,9 @@ export const configSchema = z
     ...themeSettingsSchema.shape,
     leader: z.string().default(defaultLeader),
     keybindings: keybindingsSchema.optional(),
-    defaultAgent: z.string().default("copilot"),
+    defaultAgent: z.string().default("opencode"),
     agents: z.record(z.string(), agentSchema).default({
+      opencode: { command: "opencode", args: ["acp"], env: {} },
       copilot: { command: "copilot", args: ["--acp", "--stdio"], env: {} },
     }),
   })

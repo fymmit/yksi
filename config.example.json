@@ -1,5 +1,5 @@
 {
-  "defaultAgent": "copilot",
+  "defaultAgent": "opencode",
   "themes": {
     "my-mocha": {
       "extends": "catppuccin-mocha",
@@ -21,6 +21,11 @@
     "composer.newline": ["shift+enter", "alt+enter"]
   },
   "agents": {
+    "opencode": {
+      "command": "opencode",
+      "args": ["acp"],
+      "env": {}
+    },
     "copilot": {
       "command": "copilot",
       "args": ["--acp", "--stdio"],
