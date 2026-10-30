@@ -42,6 +42,8 @@ from other directories. Bundles require the preload too (see README).
 - `src/state.ts`: serializable conversation model and update reducer.
 - `src/storage.ts`: SQLite persistence, workspace-scoped local history.
 - `src/ui/`: Solid components, palette, composer, tool/diff rendering and themes.
+  `form.tsx` and `form-state.ts` render and validate keyboard-driven elicitation
+  forms, with JSON fallback for arrays and unsupported widget types.
 - `src/demo-agent.ts`: real stdio ACP demo; simulated edits, no model service.
 - `tests/fixtures/agent.ts`: deterministic protocol fixture for lifecycle tests.
 - `bin/acp-tui.ts`, `scripts/build.ts`: launcher and bundle build.
@@ -86,6 +88,14 @@ terminal services, permissions, form/URL elicitation, cancellation, local sessio
 history and advertised resumption, file attachments, dynamic agent commands and
 configuration, themes, sidebar, export and offline demo. Input history is per
 session; drafts survive session switches within the running TUI.
+Forms show one question at a time: Up/Down highlights boolean/enum options,
+Enter confirms and advances, Left/Right revisits questions with drafts retained.
+Text/number answers also use Enter; text uses Shift/Alt+Enter for newlines and
+Ctrl+B/F for cursor movement. Defaults require confirmation, optional questions
+can be explicitly skipped, and the final answer triggers validated submission.
+Ctrl+E switches to JSON with explicit Ctrl+Enter submission; returning to questions
+requires valid JSON without implicitly confirming changed answers. Arrays use
+JSON rather than visual widgets.
 
 The first release targets Linux/macOS. Linux is locally exercised; CI also
 targets macOS. Copilot CLI 1.0.105 was verified for ACP initialization, session
@@ -94,7 +104,7 @@ creation, and advertised commands/settings. Automated tests use offline agents.
 Not yet implemented: remote transports, agent-registry installation, standalone
 native executables, background/multi-agent sessions, remote session discovery,
 image/audio attachments, terminal-based authentication, editable keymaps, Git
-undo/revert, or visual form widgets (forms currently use validated JSON input).
+undo/revert, or visual multi-select form widgets.
 Demo sessions cannot resume after their process exits; local transcripts remain.
 
 ## Adding an agent

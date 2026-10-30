@@ -32,7 +32,17 @@ const app = acp.agent({ name: "acp-tui-demo" })
     const text = ctx.params.prompt.filter(c => c.type === "text").map(c => c.text).join("\n");
     session.history.push({ sessionUpdate: "user_message_chunk", content: { type: "text", text } });
     if (text === "/question") {
-      const answer = await ctx.client.request("elicitation/create", { sessionId, mode: "form", message: "What would you like to build?", requestedSchema: { type: "object", properties: { name: { type: "string", title: "Project name", minLength: 1 }, tests: { type: "boolean", title: "Include tests", default: true } }, required: ["name"] } });
+      const answer = await ctx.client.request("elicitation/create", { sessionId, mode: "form", message: "What would you like to build?", requestedSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", title: "Project name", minLength: 1 },
+          tests: { type: "boolean", title: "Include tests", default: true },
+          template: { type: "string", title: "Template", oneOf: [{ const: "cli", title: "Command-line app" }, { const: "web", title: "Web app" }], default: "cli" },
+          workers: { type: "integer", title: "Workers", minimum: 1, maximum: 8, default: 1 },
+          notes: { type: "string", title: "Notes", description: "Optional instructions for this demo project." },
+        },
+        required: ["name"],
+      } });
       await update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: `Your answer: ${JSON.stringify(answer)}` } });
       return { stopReason: session.cancelled ? "cancelled" : "end_turn" };
     }

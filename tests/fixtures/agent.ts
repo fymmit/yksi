@@ -16,6 +16,16 @@ const app = acp.agent({ name: "test-agent" })
   .onRequest("session/prompt", async ctx => {
     const text = ctx.params.prompt[0];
     if (text?.type === "text" && text.text === "crash") process.exit(7);
+    if (text?.type === "text" && text.text === "questions") {
+      const answers = await Promise.all(["First question", "Second question"].map(message => ctx.client.request("elicitation/create", {
+        sessionId: ctx.params.sessionId, mode: "form", message,
+        requestedSchema: { properties: { name: { type: "string", title: "Name", minLength: 1 } }, required: ["name"] },
+      })));
+      await ctx.client.notify("session/update", { sessionId: ctx.params.sessionId, update: {
+        sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify(answers) },
+      } });
+      return { stopReason: "end_turn" };
+    }
     const { terminalId } = await ctx.client.request("terminal/create", { sessionId: ctx.params.sessionId, command: process.execPath, args: ["-e", 'console.log("terminal through ACP")'] });
     await ctx.client.notify("session/update", { sessionId: ctx.params.sessionId, update: { sessionUpdate: "tool_call", toolCallId: "terminal", title: "Run command", status: "in_progress", content: [{ type: "terminal", terminalId }] } });
     await ctx.client.request("terminal/wait_for_exit", { sessionId: ctx.params.sessionId, terminalId });

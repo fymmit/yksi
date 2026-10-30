@@ -124,7 +124,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       return;
     }
     if (key.ctrl && key.name === "o") { key.preventDefault(); setExpanded(value => !value); return; }
-    if (key.name === "pageup" || key.name === "pagedown") { key.preventDefault(); scroll?.scrollBy(key.name === "pageup" ? -10 : 10); return; }
+    if (!state.interaction?.form && (key.name === "pageup" || key.name === "pagedown")) { key.preventDefault(); scroll?.scrollBy(key.name === "pageup" ? -10 : 10); return; }
     if (state.interaction) return;
     if (key.name === "escape") {
       key.preventDefault();

@@ -61,6 +61,39 @@ test("structured input is returned to the agent", async () => {
   } finally { dispose(); }
 });
 
+test("structured question decline and cancel outcomes round trip over ACP", async () => {
+  for (const action of ["decline", "cancel"]) {
+    const { controller, dispose } = setup();
+    try {
+      controller.on("change", (state: Snapshot) => { if (state.interaction?.form) controller.answer(action === "decline" ? "decline" : undefined); });
+      await controller.open();
+      await controller.send("/question");
+      const last = controller.session.items.at(-1);
+      expect(last?.type === "message" && JSON.parse(last.text.replace("Your answer: ", ""))).toEqual({ action });
+      expect(controller.snapshot().interaction).toBeUndefined();
+    } finally { dispose(); }
+  }
+});
+
+test("cancelling a turn resolves all queued forms", async () => {
+  const { controller, dispose } = setup();
+  controller.config.agents.demo!.args = [resolve(import.meta.dir, "fixtures/agent.ts")];
+  try {
+    const asked = new Promise<void>(resolve => {
+      controller.on("change", (state: Snapshot) => { if (state.interaction?.form) resolve(); });
+    });
+    await controller.open();
+    const turn = controller.send("questions");
+    await asked;
+    await controller.cancel();
+    await turn;
+    expect(controller.snapshot().interaction).toBeUndefined();
+    expect(controller.status).toBe("ready");
+    const last = controller.session.items.at(-1);
+    expect(last?.type === "message" && JSON.parse(last.text)).toEqual([{ action: "cancel" }, { action: "cancel" }]);
+  } finally { dispose(); }
+});
+
 test("failed remote load preserves a readable local transcript", async () => {
   const { controller, dispose } = setup();
   try {

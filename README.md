@@ -48,7 +48,7 @@ You can also run `bun /absolute/path/to/acp-tui/bin/acp-tui.ts` from any directo
 - Multiline composer, bracketed paste, per-session prompt history and draft retention.
 - Searchable command, agent, session, file and model/mode pickers.
 - Agent-advertised commands and configuration, including boolean options.
-- Permission prompts using the agent's exact options; queued structured questions.
+- Permission prompts using the agent's exact options; keyboard-driven structured forms.
 - ACP client filesystem operations and bounded, UTF-8-safe terminal output.
 - Cancellation, connection error reporting, explicit reconnect and process cleanup.
 - SQLite transcript history, supported remote resumption, Markdown export.
@@ -97,9 +97,25 @@ is read when submitting (up to 1 MiB per file), embedded as an ACP resource when
 supported, otherwise sent as text. Use **Clear attachments** in the palette to
 remove the selection. Inline `@path` tokens are not automatically expanded.
 
-Structured form requests display the agent's field schema and an editable JSON
-answer. Ctrl+Enter validates and submits, Ctrl+D declines, Escape cancels. URL
-requests display a selectable link to open in your browser.
+Structured forms show **one question at a time** with answer progress. Up/Down
+highlights an option; Enter confirms it and moves to the next unanswered question.
+Left/Right revisits questions without losing drafts or changing confirmed
+choices. Defaults still need confirmation. Once every question is answered or
+explicitly skipped, the validated form is submitted automatically.
+
+For text and numbers, type an answer and press Enter. Shift+Enter / Alt+Enter
+inserts a text newline; Ctrl+B / Ctrl+F moves the cursor, since Left/Right switches
+questions (Home/End also work). Optional choices include **Skip**; Ctrl+U skips an
+optional text/number question or clears a required answer. Skipping omits the
+property rather than submitting an empty string, zero or false. Required
+questions are marked `*`; invalid answers stay open with an error.
+
+Ctrl+D declines and Escape cancels. Ctrl+E switches to advanced JSON editing,
+where Ctrl+Enter explicitly validates and submits. Returning to questions
+requires valid JSON and does not submit or confirm changed answers. Arrays and
+unsupported widget types use JSON automatically, with schema validation still
+required. Try `/question` in the offline demo. URL requests display a selectable
+link to open in your browser.
 
 ## Agent configuration
 

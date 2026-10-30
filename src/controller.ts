@@ -70,7 +70,7 @@ export class Controller extends EventEmitter {
         this.pending = this.pending.filter(item => item !== entry);
         resolve({ id, content }); this.publish(true);
       } };
-      if (signal.aborted) { resolve({}); return; }
+      if (signal.aborted || this.status === "cancelling" || this.closed) { resolve({}); return; }
       this.pending.push(entry);
       signal.addEventListener("abort", abort, { once: true });
       this.publish(true);
