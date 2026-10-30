@@ -4,15 +4,23 @@
   "private": true,
   "type": "module",
   "description": "A keyboard-first terminal client for ACP coding agents",
-  "bin": { "acp-tui": "bin/acp-tui.ts" },
+  "bin": {
+    "acp-tui": "bin/acp-tui.ts"
+  },
   "scripts": {
     "start": "bun src/index.tsx",
     "dev": "bun --watch src/index.tsx",
     "demo": "bun src/index.tsx --demo",
     "build": "bun scripts/build.ts",
+    "prepare": "bun run --bun husky",
+    "format": "bun run --bun biome format --write .",
+    "format:check": "bun run --bun biome format .",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "check": "bun run typecheck && bun test"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,md,markdown,yml,yaml}": "bun run --bun biome format --write --no-errors-on-unmatched"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "2.1.0",
@@ -25,8 +33,13 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.4",
     "@types/bun": "^1.3.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
     "typescript": "^5.9.3"
   },
-  "engines": { "bun": ">=1.4.1" }
+  "engines": {
+    "bun": ">=1.4.1"
+  }
 }

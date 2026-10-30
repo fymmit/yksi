@@ -63,27 +63,27 @@ You can also run `bun /absolute/path/to/acp-tui/bin/acp-tui.ts` from any directo
 These are the default bindings. See [Custom keybindings](#custom-keybindings) to
 change them.
 
-| Key | Action |
-| --- | --- |
-| Enter | Send prompt |
-| Shift+Enter / Alt+Enter | Insert newline |
-| Ctrl+P | Command palette |
-| F1 | Open/close keyboard shortcut help |
-| Ctrl+N | New session |
-| Ctrl+S | Project session history |
-| Ctrl+A | Choose an agent, opening a new session |
-| Ctrl+M | Advertised model, mode and agent settings |
-| Shift+Tab | Cycle through advertised agent modes |
-| Ctrl+F | Attach a text file |
-| Tab after `/…` | Complete a slash command |
-| Tab after `@` | Open the file picker |
-| Ctrl+Up / Ctrl+Down | Prompt history |
-| Ctrl+O | Expand/collapse tool details, including during permissions |
-| Ctrl+B | Toggle sidebar (automatically hidden in narrow terminals) |
-| PageUp / PageDown | Scroll conversation |
-| Escape | Close help/picker, cancel an interaction, or cancel the active turn |
-| Ctrl+C | Cancel while busy; otherwise quit |
-| Ctrl+Q | Quit |
+| Key                     | Action                                                              |
+| ----------------------- | ------------------------------------------------------------------- |
+| Enter                   | Send prompt                                                         |
+| Shift+Enter / Alt+Enter | Insert newline                                                      |
+| Ctrl+P                  | Command palette                                                     |
+| F1                      | Open/close keyboard shortcut help                                   |
+| Ctrl+N                  | New session                                                         |
+| Ctrl+S                  | Project session history                                             |
+| Ctrl+A                  | Choose an agent, opening a new session                              |
+| Ctrl+M                  | Advertised model, mode and agent settings                           |
+| Shift+Tab               | Cycle through advertised agent modes                                |
+| Ctrl+F                  | Attach a text file                                                  |
+| Tab after `/…`          | Complete a slash command                                            |
+| Tab after `@`           | Open the file picker                                                |
+| Ctrl+Up / Ctrl+Down     | Prompt history                                                      |
+| Ctrl+O                  | Expand/collapse tool details, including during permissions          |
+| Ctrl+B                  | Toggle sidebar (automatically hidden in narrow terminals)           |
+| PageUp / PageDown       | Scroll conversation                                                 |
+| Escape                  | Close help/picker, cancel an interaction, or cancel the active turn |
+| Ctrl+C                  | Cancel while busy; otherwise quit                                   |
+| Ctrl+Q                  | Quit                                                                |
 
 Arrow keys and Enter select in pickers and permission prompts. Tool headers are
 also clickable, and the conversation supports mouse scrolling. If Shift+Enter is
@@ -271,56 +271,56 @@ Add `keybindings` to the same global configuration file (or the file selected by
 
 Application actions are active with the composer, except where noted:
 
-| Action | Default | Behavior |
-| --- | --- | --- |
-| `app.commands` | `ctrl+p` | Open command palette |
-| `app.help` | `f1` | Open/close keyboard shortcuts; active everywhere |
-| `app.new` | `ctrl+n` | New session |
-| `app.sessions` | `ctrl+s` | Switch session |
-| `app.agents` | `ctrl+a` | Switch agent |
-| `app.config` | `ctrl+m` | Agent model/mode/settings |
-| `app.cycle-mode` | `shift+tab` | Cycle advertised agent modes |
-| `app.files` | `ctrl+f` | Attach file |
-| `app.sidebar` | `ctrl+b` | Toggle sidebar |
-| `app.tools` | `ctrl+o` | Toggle tool details; suspended in help |
-| `app.quit` | `ctrl+q` | Quit; active everywhere |
-| `app.interrupt` | `ctrl+c` | Cancel while busy, otherwise quit; active everywhere |
-| `app.cancel` | `escape` | Close help/picker, cancel interaction/turn, or clear notice/error |
+| Action                            | Default               | Behavior                                                                       |
+| --------------------------------- | --------------------- | ------------------------------------------------------------------------------ |
+| `app.commands`                    | `ctrl+p`              | Open command palette                                                           |
+| `app.help`                        | `f1`                  | Open/close keyboard shortcuts; active everywhere                               |
+| `app.new`                         | `ctrl+n`              | New session                                                                    |
+| `app.sessions`                    | `ctrl+s`              | Switch session                                                                 |
+| `app.agents`                      | `ctrl+a`              | Switch agent                                                                   |
+| `app.config`                      | `ctrl+m`              | Agent model/mode/settings                                                      |
+| `app.cycle-mode`                  | `shift+tab`           | Cycle advertised agent modes                                                   |
+| `app.files`                       | `ctrl+f`              | Attach file                                                                    |
+| `app.sidebar`                     | `ctrl+b`              | Toggle sidebar                                                                 |
+| `app.tools`                       | `ctrl+o`              | Toggle tool details; suspended in help                                         |
+| `app.quit`                        | `ctrl+q`              | Quit; active everywhere                                                        |
+| `app.interrupt`                   | `ctrl+c`              | Cancel while busy, otherwise quit; active everywhere                           |
+| `app.cancel`                      | `escape`              | Close help/picker, cancel interaction/turn, or clear notice/error              |
 | `app.scrollUp` / `app.scrollDown` | `pageup` / `pagedown` | Scroll transcript; also active in pickers/permissions, suspended in forms/help |
-| `app.clear-attachments` | Unbound | Clear attachments |
-| `app.reconnect` | Unbound | Reconnect current session |
-| `app.thoughts` | Unbound | Toggle reasoning visibility |
-| `app.theme` | Unbound | Toggle theme |
-| `app.earlier` | Unbound | Show earlier messages |
-| `app.export` | Unbound | Export transcript |
-| `app.paths` | Unbound | Show configuration/data paths |
-| `app.usage` | Unbound | Show last reported session cost/context |
+| `app.clear-attachments`           | Unbound               | Clear attachments                                                              |
+| `app.reconnect`                   | Unbound               | Reconnect current session                                                      |
+| `app.thoughts`                    | Unbound               | Toggle reasoning visibility                                                    |
+| `app.theme`                       | Unbound               | Toggle theme                                                                   |
+| `app.earlier`                     | Unbound               | Show earlier messages                                                          |
+| `app.export`                      | Unbound               | Export transcript                                                              |
+| `app.paths`                       | Unbound               | Show configuration/data paths                                                  |
+| `app.usage`                       | Unbound               | Show last reported session cost/context                                        |
 
 Composer, picker, help, and interaction actions are active only in their corresponding UI:
 
-| Action | Default | Behavior |
-| --- | --- | --- |
-| `composer.submit` | `enter` | Send prompt or run client command |
-| `composer.newline` | `shift+enter`, `alt+enter` | Insert newline |
-| `composer.complete` | `tab` | Complete `/…` or attach file after `@` |
-| `composer.historyPrevious` / `composer.historyNext` | `ctrl+up` / `ctrl+down` | Browse prompt history |
-| `picker.previous` / `picker.next` | `up` / `down` | Highlight choice |
-| `picker.confirm` | `enter` | Select choice |
-| `help.previous` / `help.next` | `up` / `down` | Scroll shortcut reference |
-| `help.pageUp` / `help.pageDown` | `pageup` / `pagedown` | Page shortcut reference |
-| `permission.previous` / `permission.next` | `up` / `down` | Highlight permission/URL-request option |
-| `permission.confirm` | `enter` | Confirm highlighted agent option |
-| `form.decline` | `ctrl+d` | Decline form, including JSON mode |
-| `form.toggleJson` | `ctrl+e` | Switch questions/JSON |
-| `form.submitJson` | `ctrl+enter` | Validate and submit JSON |
-| `form.jsonNewline` | `enter` | Insert newline in JSON |
-| `form.previous` / `form.next` | `left` / `right` | Revisit question |
-| `form.confirm` | `enter`, `ctrl+enter` | Confirm question and advance |
-| `form.clear` | `ctrl+u` | Skip optional question or clear required answer |
-| `form.optionPrevious` / `form.optionNext` | `up` / `down` | Highlight question option |
-| `form.toggle` | `space` | Toggle highlighted checkbox |
-| `form.cursorLeft` / `form.cursorRight` | `ctrl+b` / `ctrl+f` | Move cursor in text/number answers |
-| `form.newline` | `shift+enter`, `alt+enter` | Insert newline in text/number editor |
+| Action                                              | Default                    | Behavior                                        |
+| --------------------------------------------------- | -------------------------- | ----------------------------------------------- |
+| `composer.submit`                                   | `enter`                    | Send prompt or run client command               |
+| `composer.newline`                                  | `shift+enter`, `alt+enter` | Insert newline                                  |
+| `composer.complete`                                 | `tab`                      | Complete `/…` or attach file after `@`          |
+| `composer.historyPrevious` / `composer.historyNext` | `ctrl+up` / `ctrl+down`    | Browse prompt history                           |
+| `picker.previous` / `picker.next`                   | `up` / `down`              | Highlight choice                                |
+| `picker.confirm`                                    | `enter`                    | Select choice                                   |
+| `help.previous` / `help.next`                       | `up` / `down`              | Scroll shortcut reference                       |
+| `help.pageUp` / `help.pageDown`                     | `pageup` / `pagedown`      | Page shortcut reference                         |
+| `permission.previous` / `permission.next`           | `up` / `down`              | Highlight permission/URL-request option         |
+| `permission.confirm`                                | `enter`                    | Confirm highlighted agent option                |
+| `form.decline`                                      | `ctrl+d`                   | Decline form, including JSON mode               |
+| `form.toggleJson`                                   | `ctrl+e`                   | Switch questions/JSON                           |
+| `form.submitJson`                                   | `ctrl+enter`               | Validate and submit JSON                        |
+| `form.jsonNewline`                                  | `enter`                    | Insert newline in JSON                          |
+| `form.previous` / `form.next`                       | `left` / `right`           | Revisit question                                |
+| `form.confirm`                                      | `enter`, `ctrl+enter`      | Confirm question and advance                    |
+| `form.clear`                                        | `ctrl+u`                   | Skip optional question or clear required answer |
+| `form.optionPrevious` / `form.optionNext`           | `up` / `down`              | Highlight question option                       |
+| `form.toggle`                                       | `space`                    | Toggle highlighted checkbox                     |
+| `form.cursorLeft` / `form.cursorRight`              | `ctrl+b` / `ctrl+f`        | Move cursor in text/number answers              |
+| `form.newline`                                      | `shift+enter`, `alt+enter` | Insert newline in text/number editor            |
 
 Question confirmation, skipping, toggling, and JSON submission ignore key-repeat
 events so holding a key cannot confirm multiple answers. Navigation can repeat.
@@ -346,7 +346,9 @@ or restarting. Export writes `acp-session-<id>.md` in the current project.
 ## Development and verification
 
 ```sh
+bun install --frozen-lockfile
 bun run dev
+bun run format:check
 bun run check
 bun run build
 bun --preload @opentui/solid/preload dist/index.js --demo
@@ -361,6 +363,34 @@ cancellation, crash recovery, replay, terminal output, state/persistence, and
 headless native UI keyboard/rendering behavior. They require no login or paid
 model calls. CI targets Linux and macOS. See [`AGENTS.md`](AGENTS.md) for repository
 architecture and guidance for future coding sessions.
+
+### Formatting and commit hooks
+
+Biome formats JavaScript/TypeScript (including TSX), JSON/JSONC, Markdown, and
+YAML. Run `bun run format` to format the project, or `bun run format:check` to
+check it without writing changes. CI enforces the same formatting on Linux and
+macOS. Dependencies, generated `dist/` output, `bun.lock`, and Git-ignored files
+are excluded. Biome uses two-space indentation, double quotes, semicolons, and
+a preferred line width of 100. Its version is pinned for reproducible output.
+
+`bun install` installs the Husky pre-commit hook through the `prepare` script.
+The hook runs lint-staged and Biome on whole staged files, automatically staging
+the formatted result. lint-staged temporarily hides unstaged edits in partially
+staged files and restores them afterward. Bun must be on the committing process's
+`PATH`. Set `HUSKY=0` to skip hook installation/execution in CI.
+
+Bulk formatting belongs in a dedicated `style:` commit containing only formatter
+output. Record its full commit hash in `.git-blame-ignore-revs` in a subsequent
+commit, including after formatter upgrades that change output broadly. Enable
+the shared ignore list for local blame once per checkout:
+
+```sh
+git config --local blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+GitHub also uses this file in its blame view. Preserve these commits when merging
+(avoid squash/rebase that changes the recorded hash), or update the ignore list
+to the formatting commit's final hash afterward. Existing history is not rewritten.
 
 ### Current scope
 

@@ -22,6 +22,8 @@ bun install --frozen-lockfile
 bun run start                 # Copilot in the current project
 bun run demo                  # offline ACP demonstration
 bun run start -- /path/to/project --agent copilot
+bun run format                # Biome formatting pass
+bun run format:check          # read-only formatting check (also enforced in CI)
 bun run check                 # strict type-check + tests
 bun run build                 # Bun bundle in dist/ (native deps stay external)
 ```
@@ -115,6 +117,16 @@ from other directories. Bundles require the preload too (see README).
   mounted but inactive so drafts, selection, and cursor position survive. Only
   help controls and global quit/interrupt handlers act; Escape closes help alone.
 - Keep dependencies pinned via `bun.lock`; do not edit vendored dependencies.
+- Biome is the pinned formatter for JS/TS/TSX, JSON/JSONC, Markdown, and YAML.
+  Use `bun run format` / `bun run format:check`; linting and assist are disabled.
+  `bun install` prepares Husky; its pre-commit hook runs lint-staged on whole
+  staged files, preserving unstaged edits in partially staged files. Keep the
+  file extensions in `biome.json` and `package.json`'s `lint-staged` entry aligned.
+  Dependencies, `dist/`, `bun.lock`, and Git-ignored files are excluded.
+  Keep bulk formatter output in a dedicated `style:` commit, then record its
+  full hash in `.git-blame-ignore-revs` in a following commit. Preserve that hash
+  when merging; local blame opts in with
+  `git config --local blame.ignoreRevsFile .git-blame-ignore-revs`.
 - Changes to protocol/state/lifecycle need meaningful tests. For UI behavior use
   `testRender`, real key events, and frame assertions; always dispose renderers.
   Markdown highlighting runs in a worker, so wait for a rendered predicate.
