@@ -364,7 +364,8 @@ test("floating help searches all shortcuts and closes without cancelling a turn 
     await setup.mockInput.typeText("composer.newline");
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Insert newline");
-    expect(setup.captureCharFrame()).toContain("Shift+Enter / Alt+Enter");
+    expect(setup.captureCharFrame()).toContain("Shift+Enter");
+    expect(setup.captureCharFrame()).not.toContain("Shift+Enter / Alt+Enter");
     setup.mockInput.pressEnter();
     expect(setup.prompts).toEqual([]);
     setup.mockInput.pressKey("ESCAPE");

@@ -48,7 +48,7 @@ export const keyActions = {
   "app.paths": action(["composer"]),
   "app.usage": action(["composer"]),
   "composer.submit": action(["composer"], "enter"),
-  "composer.newline": action(["composer"], "shift+enter", "alt+enter"),
+  "composer.newline": action(["composer"], "shift+enter"),
   "composer.complete": action(["composer"], "tab"),
   "composer.historyPrevious": action(["composer"], "up", "ctrl+p"),
   "composer.historyNext": action(["composer"], "down", "ctrl+n"),
