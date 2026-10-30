@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import type { Theme } from "./theme";
+import { editorColors, selectionColors, type Theme } from "./theme";
 import { defaultKeybindings, type Keybindings } from "../keybindings";
 import { consumeKey, suppressEditorFallback } from "./keybindings";
 
@@ -59,12 +59,12 @@ export function Picker(props: {
     <box
       flexDirection="column"
       border
-      borderColor={props.theme.accent}
+      borderColor={props.theme.focusBorder}
       backgroundColor={props.theme.panel}
       paddingX={1}
       flexShrink={0}
     >
-      <text fg={props.theme.accent}>
+      <text {...selectionColors(props.theme)} fg={props.theme.accent}>
         {props.title} · {keys.hint("app.cancel", "close")}
       </text>
       <input
@@ -74,9 +74,7 @@ export function Picker(props: {
           setQuery(value);
           setIndex(0);
         }}
-        textColor={props.theme.text}
-        backgroundColor={props.theme.panel}
-        focusedBackgroundColor={props.theme.panel}
+        {...editorColors(props.theme)}
       />
       <For each={visible()}>
         {choice => (
@@ -84,15 +82,30 @@ export function Picker(props: {
             onMouseDown={() => select(choice)}
             flexDirection="column"
             backgroundColor={
-              choices()[index()]?.id === choice.id ? props.theme.border : props.theme.panel
+              choices()[index()]?.id === choice.id
+                ? props.theme.selectedBackground
+                : props.theme.panel
             }
           >
-            <text fg={props.theme.text}>
+            <text
+              {...selectionColors(props.theme)}
+              fg={
+                choices()[index()]?.id === choice.id ? props.theme.selectedText : props.theme.text
+              }
+            >
               {choices()[index()]?.id === choice.id ? "› " : "  "}
               {choice.label}
             </text>
             <Show when={choice.detail}>
-              <text fg={props.theme.muted} maxHeight={1}>
+              <text
+                {...selectionColors(props.theme)}
+                fg={
+                  choices()[index()]?.id === choice.id
+                    ? props.theme.selectedMuted
+                    : props.theme.muted
+                }
+                maxHeight={1}
+              >
                 {" "}
                 {choice.detail}
               </text>
@@ -101,9 +114,11 @@ export function Picker(props: {
         )}
       </For>
       <Show when={!choices().length}>
-        <text fg={props.theme.muted}>No matches</text>
+        <text {...selectionColors(props.theme)} fg={props.theme.muted}>
+          No matches
+        </text>
       </Show>
-      <text fg={props.theme.muted}>
+      <text {...selectionColors(props.theme)} fg={props.theme.muted}>
         {keys.hint("picker.previous", "previous")} · {keys.hint("picker.next", "next")} ·{" "}
         {keys.hint("picker.confirm", "confirm")}
       </text>

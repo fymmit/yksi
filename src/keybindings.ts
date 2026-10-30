@@ -97,7 +97,7 @@ export const keyDescriptions: Record<KeyAction, string> = {
   "app.clear-attachments": "Clear attachments",
   "app.reconnect": "Reconnect current session",
   "app.thoughts": "Show / hide reasoning",
-  "app.theme": "Toggle light / dark theme",
+  "app.theme": "Choose theme",
   "app.earlier": "Show earlier messages",
   "app.export": "Export transcript to Markdown",
   "app.paths": "Show configuration and data paths",

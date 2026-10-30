@@ -1,5 +1,20 @@
 {
   "defaultAgent": "copilot",
+  "themes": {
+    "my-mocha": {
+      "extends": "catppuccin-mocha",
+      "colors": {
+        "background": "#181825",
+        "cursor": "#f5e0dc"
+      },
+      "syntax": {
+        "keyword": "#f38ba8"
+      },
+      "markdown": {
+        "heading": "#b4befe"
+      }
+    }
+  },
   "keybindings": {
     "app.commands": ["ctrl+p", "f2"],
     "composer.submit": ["enter"],

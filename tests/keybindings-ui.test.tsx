@@ -234,6 +234,10 @@ test("remapped app commands update hints, consume only exact keys and keep palet
     expect(setup.storage.setting("sidebar", true)).toBe(true);
     setup.mockInput.pressKey("t", { meta: true });
     await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Choose theme");
+    await setup.mockInput.typeText("Light");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
     expect(setup.storage.setting("theme", "dark")).toBe("light");
     setup.mockInput.pressKey("p", { meta: true });
     await setup.mockInput.typeText("Toggle sidebar");

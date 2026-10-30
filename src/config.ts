@@ -3,19 +3,23 @@ import { join, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { z } from "zod";
 import { keybindingsSchema } from "./keybindings";
+import { themeSettingsSchema, validateThemeSettings } from "./themes";
 
 const agentSchema = z.object({
   command: z.string().min(1),
   args: z.array(z.string()).default([]),
   env: z.record(z.string(), z.string()).default({}),
 });
-export const configSchema = z.object({
-  keybindings: keybindingsSchema.optional(),
-  defaultAgent: z.string().default("copilot"),
-  agents: z.record(z.string(), agentSchema).default({
-    copilot: { command: "copilot", args: ["--acp", "--stdio"], env: {} },
-  }),
-});
+export const configSchema = z
+  .object({
+    ...themeSettingsSchema.shape,
+    keybindings: keybindingsSchema.optional(),
+    defaultAgent: z.string().default("copilot"),
+    agents: z.record(z.string(), agentSchema).default({
+      copilot: { command: "copilot", args: ["--acp", "--stdio"], env: {} },
+    }),
+  })
+  .superRefine(validateThemeSettings);
 export type AgentDefinition = z.infer<typeof agentSchema>;
 export type Config = z.infer<typeof configSchema>;
 

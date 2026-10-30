@@ -12,7 +12,7 @@ import {
   type FormErrors,
   type QuestionState,
 } from "./form-state";
-import type { Theme } from "./theme";
+import { editorColors, scrollbarColors, selectionColors, type Theme } from "./theme";
 import { defaultKeybindings, type Keybindings, type KeyContext } from "../keybindings";
 import { consumeKey, suppressEditorFallback } from "./keybindings";
 
@@ -325,19 +325,25 @@ export function FormView(props: {
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0}>
       <Show when={props.schema.title}>
-        <text fg={props.theme.text}>{props.schema.title}</text>
+        <text {...selectionColors(props.theme)} fg={props.theme.text}>
+          {props.schema.title}
+        </text>
       </Show>
       <Show when={props.schema.description}>
-        <text fg={props.theme.muted}>{props.schema.description}</text>
+        <text {...selectionColors(props.theme)} fg={props.theme.muted}>
+          {props.schema.description}
+        </text>
       </Show>
       <Show when={form.schemaError}>
-        <text fg={props.theme.error}>{form.schemaError}</text>
+        <text {...selectionColors(props.theme)} fg={props.theme.error}>
+          {form.schemaError}
+        </text>
       </Show>
       <Show
         when={json()}
         fallback={
           <>
-            <text fg={props.theme.muted} flexShrink={0}>
+            <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
               Question {form.fields.length ? index() + 1 : 0}/{form.fields.length} ·{" "}
               {questions().filter(question => question.confirmed).length} answered
             </text>
@@ -345,7 +351,7 @@ export function FormView(props: {
               when={form.fields[index()]}
               keyed
               fallback={
-                <text fg={props.theme.text}>
+                <text {...selectionColors(props.theme)} fg={props.theme.text}>
                   No questions. {hint("form.confirm", "to submit")}.
                 </text>
               }
@@ -361,12 +367,14 @@ export function FormView(props: {
                 let editor: TextareaRenderable | undefined;
                 return (
                   <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0}>
-                    <text fg={props.theme.accent} flexShrink={0}>
+                    <text {...selectionColors(props.theme)} fg={props.theme.accent} flexShrink={0}>
                       {field.title}
                       {field.required ? " *" : " (optional)"}
                     </text>
                     <Show when={field.description}>
-                      <text fg={props.theme.muted}>{field.description}</text>
+                      <text {...selectionColors(props.theme)} fg={props.theme.muted}>
+                        {field.description}
+                      </text>
                     </Show>
                     <Show
                       when={choices.length}
@@ -380,9 +388,7 @@ export function FormView(props: {
                           height={field.type === "string" ? 3 : 1}
                           initialValue={untrack(() => question().text ?? "")}
                           placeholder={field.type === "string" ? "Enter text" : "Enter a number"}
-                          textColor={props.theme.text}
-                          backgroundColor={props.theme.bg}
-                          focusedBackgroundColor={props.theme.bg}
+                          {...editorColors(props.theme)}
                           onContentChange={() => {
                             if (editor && editor.plainText !== (question().text ?? ""))
                               update(position, { text: editor.plainText, confirmed: false });
@@ -391,6 +397,7 @@ export function FormView(props: {
                       }
                     >
                       <scrollbox
+                        scrollbarOptions={scrollbarColors(props.theme)}
                         ref={value => {
                           optionsScroll = value;
                           value.afterLayout(() =>
@@ -408,6 +415,7 @@ export function FormView(props: {
                         <For each={choices}>
                           {(choice, i) => (
                             <text
+                              {...selectionColors(props.theme)}
                               id={`question-option-${position}-${i()}`}
                               fg={
                                 question().highlight === i() ? props.theme.accent : props.theme.text
@@ -436,15 +444,17 @@ export function FormView(props: {
                       </scrollbox>
                     </Show>
                     <Show when={Object.hasOwn(errors().fields, field.name)}>
-                      <text fg={props.theme.error}>{errors().fields[field.name]}</text>
+                      <text {...selectionColors(props.theme)} fg={props.theme.error}>
+                        {errors().fields[field.name]}
+                      </text>
                     </Show>
                     <Show when={field.type === "array"}>
-                      <text fg={props.theme.muted} flexShrink={0}>
+                      <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
                         {selected().length} selected ·{" "}
                         {hint("form.clear", field.required ? "clear" : "skip")}
                       </text>
                     </Show>
-                    <text fg={props.theme.muted} flexShrink={0}>
+                    <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
                       {[
                         ...(choices.length
                           ? [
@@ -463,7 +473,7 @@ export function FormView(props: {
                       ].join(" · ")}
                     </text>
                     <Show when={!choices.length}>
-                      <text fg={props.theme.muted} flexShrink={0}>
+                      <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
                         {hint("form.cursorLeft", "left")} · {hint("form.cursorRight", "right")}
                         {field.type === "string" ? ` · ${hint("form.newline", "newline")}` : ""}
                       </text>
@@ -472,7 +482,7 @@ export function FormView(props: {
                 );
               }}
             </Show>
-            <text fg={props.theme.muted} flexShrink={0}>
+            <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
               {hint("form.previous", "back")} · {hint("form.next", "next")} ·{" "}
               {hint("form.toggleJson", "JSON")}
             </text>
@@ -480,12 +490,14 @@ export function FormView(props: {
         }
       >
         <Show when={fallback().length}>
-          <text fg={props.theme.warning}>JSON required for: {fallback().join(", ")}</text>
+          <text {...selectionColors(props.theme)} fg={props.theme.warning}>
+            JSON required for: {fallback().join(", ")}
+          </text>
         </Show>
-        <scrollbox maxHeight={3} scrollY>
+        <scrollbox maxHeight={3} scrollY scrollbarOptions={scrollbarColors(props.theme)}>
           <For each={Object.entries(props.schema.properties ?? {})}>
             {([name, schema]) => (
-              <text fg={props.theme.muted}>
+              <text {...selectionColors(props.theme)} fg={props.theme.muted}>
                 {name}: {JSON.stringify(schema)}
               </text>
             )}
@@ -498,26 +510,26 @@ export function FormView(props: {
           minHeight={2}
           maxHeight={6}
           initialValue={jsonText}
-          textColor={props.theme.text}
-          backgroundColor={props.theme.bg}
-          focusedBackgroundColor={props.theme.bg}
+          {...editorColors(props.theme)}
         />
         <For each={Object.entries(errors().fields)}>
           {([name, error]) => (
-            <text fg={props.theme.error}>
+            <text {...selectionColors(props.theme)} fg={props.theme.error}>
               {name}: {error}
             </text>
           )}
         </For>
-        <text fg={props.theme.muted} flexShrink={0}>
+        <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
           {hint("form.toggleJson", "questions")} · {hint("form.submitJson", "submit")} ·{" "}
           {hint("form.jsonNewline", "newline")}
         </text>
       </Show>
       <Show when={errors().summary}>
-        <text fg={props.theme.error}>{errors().summary}</text>
+        <text {...selectionColors(props.theme)} fg={props.theme.error}>
+          {errors().summary}
+        </text>
       </Show>
-      <text fg={props.theme.muted} flexShrink={0}>
+      <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
         {hint("form.decline", "decline")} · {hint("app.cancel", "cancel")}
       </text>
     </box>

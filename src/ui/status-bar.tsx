@@ -2,7 +2,7 @@ import { createMemo } from "solid-js";
 import type { Keybindings } from "../keybindings";
 import { sessionMode } from "../modes";
 import { changedFiles, type Session } from "../state";
-import type { Theme } from "./theme";
+import { selectionColors, type Theme } from "./theme";
 import { formatCost } from "./usage";
 
 const numbers = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
@@ -135,10 +135,16 @@ export function StatusBar(props: {
   });
   return (
     <box height={1} flexShrink={0} paddingX={1} flexDirection="row" justifyContent="space-between">
-      <text fg={props.theme.muted} height={1} minWidth={0}>
+      <text {...selectionColors(props.theme)} fg={props.theme.muted} height={1} minWidth={0}>
         {summary()}
       </text>
-      <text fg={props.theme.accent} height={1} flexShrink={0} onMouseDown={props.help}>
+      <text
+        {...selectionColors(props.theme)}
+        fg={props.theme.accent}
+        height={1}
+        flexShrink={0}
+        onMouseDown={props.help}
+      >
         {help()}
       </text>
     </box>

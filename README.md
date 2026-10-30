@@ -55,7 +55,7 @@ You can also run `bun /absolute/path/to/acp-tui/bin/acp-tui.ts` from any directo
 - SQLite transcript history, supported remote resumption, Markdown export.
 - Responsive sidebar with agent plan, reported diffs, context usage and reported session cost when available.
 - Compact session status bar and searchable floating keyboard help.
-- Light/dark themes and sidebar preferences retained across runs.
+- Thirteen built-in themes, custom UI/syntax/Markdown colors, and remembered theme/sidebar preferences.
 - Configurable, context-aware keyboard shortcuts with hints that follow your settings.
 
 ## Keyboard flow
@@ -235,6 +235,95 @@ agent; agent-side tool policies remain in effect. Sign in using the agent's own
 CLI first. Agent-handled ACP authentication methods, when advertised, are also
 available in the command palette.
 
+### Themes
+
+Open **Choose theme** in the command palette or run `/tui:theme`. Type to filter
+presets and custom themes, then press Enter to apply. Escape cancels; the current
+theme is marked in the list. Switching updates the whole interface, existing
+Markdown/code, and diffs immediately, while preserving your composer draft.
+`app.theme` opens the same picker and is unbound by default; for example, bind it
+to `alt+t` in `keybindings`.
+
+| Family      | Preset IDs                                                                          |
+| ----------- | ----------------------------------------------------------------------------------- |
+| ACP TUI     | `dark`, `light`                                                                     |
+| Gruvbox     | `gruvbox-dark`, `gruvbox-light`                                                     |
+| Catppuccin  | `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha` |
+| GitHub      | `github-dark`, `github-light`                                                       |
+| Dracula     | `dracula`                                                                           |
+| Nord        | `nord`                                                                              |
+| Tokyo Night | `tokyo-night`                                                                       |
+
+The palettes adapt colors from [Gruvbox](https://github.com/morhetz/gruvbox),
+[Catppuccin](https://github.com/catppuccin/palette),
+[GitHub Primer](https://github.com/primer/primitives),
+[Dracula](https://github.com/dracula/dracula-theme),
+[Nord](https://github.com/nordtheme/nord), and
+[Tokyo Night](https://github.com/folke/tokyonight.nvim), with matching syntax colors
+and app-specific diff backgrounds.
+
+The selected theme is saved across projects and restarts. An explicit `theme`
+in your global configuration takes priority on startup, followed by the saved
+selection, then `dark`. A saved custom theme that has since been removed falls
+back to `dark`. Picker selections still apply immediately when `theme` is set,
+but that explicit setting wins again on the next launch. Omit `theme` to always
+start with your last selection.
+
+To customize colors, add a named theme to the same configuration file:
+
+```json
+{
+  "theme": "my-mocha",
+  "themes": {
+    "my-mocha": {
+      "extends": "catppuccin-mocha",
+      "colors": {
+        "background": "#181825",
+        "accent": "#cba6f7",
+        "cursor": "#f5e0dc"
+      },
+      "syntax": {
+        "keyword": "#f38ba8",
+        "comment": "#9399b2"
+      },
+      "markdown": {
+        "heading": "#b4befe"
+      }
+    }
+  }
+}
+```
+
+Custom names use lowercase letters, numbers, and hyphens, and must not replace a
+built-in preset. `extends` must name a built-in preset. Every override is optional;
+omitted values inherit that preset's colors independently. For example, changing
+`accent` does not implicitly change `cursor`, `focusBorder`, or Markdown headings.
+Colors use six-digit `#RRGGBB` hex values. Unknown theme names, color keys, or
+invalid colors produce configuration errors. Configuration is read at startup;
+restart after editing custom definitions.
+
+**Complete override reference** (each value is a color):
+
+| Object                           | Keys                                                                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `colors`: base UI                | `background`, `panel`, `border`, `focusBorder`, `text`, `muted`, `accent`, `warning`, `error`                                                                                        |
+| `colors`: editors                | `inputBackground`, `inputText`, `inputFocusedBackground`, `inputFocusedText`, `placeholder`, `cursor`                                                                                |
+| `colors`: text selection         | `selectionBackground`, `selectionText`                                                                                                                                               |
+| `colors`: highlighted picker row | `selectedBackground`, `selectedText`, `selectedMuted`                                                                                                                                |
+| `colors`: scrollbars             | `scrollbarTrack`, `scrollbarThumb`, `scrollbarArrow`, `scrollbarArrowBackground`                                                                                                     |
+| `colors`: diff rows              | `diffAddedBackground`, `diffRemovedBackground`, `diffContextBackground`                                                                                                              |
+| `colors`: diff content           | `diffAddedContentBackground`, `diffRemovedContentBackground`, `diffContextContentBackground`                                                                                         |
+| `colors`: diff gutters           | `diffAddedSign`, `diffRemovedSign`, `diffLineNumber`, `diffLineNumberBackground`, `diffAddedLineNumberBackground`, `diffRemovedLineNumberBackground`                                 |
+| `syntax`                         | `default`, `keyword`, `string`, `comment`, `number`, `boolean`, `function`, `type`, `variable`, `constant`, `property`, `operator`, `punctuation`, `tag`, `attribute`, `constructor` |
+| `markdown`                       | `heading`, `link`, `linkUrl`, `raw`, `rawBackground`, `codeBackground`, `quote`, `list`, `strong`, `italic`, `strikethrough`, `conceal`, `tableBorder`                               |
+
+`selectedMuted` controls secondary text on the highlighted picker row.
+Diff content and gutter overrides take precedence over their row backgrounds.
+Markdown `raw`/`rawBackground` style inline code; `codeBackground` styles fenced
+code. `heading` covers all six heading levels and table headers. `conceal`
+also colors quote borders. Syntax colors apply to the categories reported by the
+highlighter; unclassified code uses `syntax.default`.
+
 ### Custom keybindings
 
 Add `keybindings` to the same global configuration file (or the file selected by
@@ -300,7 +389,7 @@ Application actions are active with the composer, except where noted:
 | `app.clear-attachments`           | Unbound               | Clear attachments                                                              |
 | `app.reconnect`                   | Unbound               | Reconnect current session                                                      |
 | `app.thoughts`                    | Unbound               | Toggle reasoning visibility                                                    |
-| `app.theme`                       | Unbound               | Toggle theme                                                                   |
+| `app.theme`                       | Unbound               | Choose theme                                                                   |
 | `app.earlier`                     | Unbound               | Show earlier messages                                                          |
 | `app.export`                      | Unbound               | Export transcript                                                              |
 | `app.paths`                       | Unbound               | Show configuration/data paths                                                  |

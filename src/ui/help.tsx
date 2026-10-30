@@ -9,7 +9,7 @@ import {
   type KeyContext,
 } from "../keybindings";
 import { consumeKey, suppressEditorFallback } from "./keybindings";
-import type { Theme } from "./theme";
+import { editorColors, scrollbarColors, selectionColors, type Theme } from "./theme";
 
 const contextNames: Record<KeyContext, string> = {
   composer: "Composer",
@@ -88,38 +88,47 @@ export function KeyboardHelp(props: {
         width={Math.max(1, Math.min(88, props.width - 2))}
         height={Math.max(1, Math.min(32, props.height - 3))}
         border
-        borderColor={props.theme.accent}
+        borderColor={props.theme.focusBorder}
         backgroundColor={props.theme.panel}
         paddingX={1}
         flexDirection="column"
       >
-        <text fg={props.theme.accent} flexShrink={0} height={1}>
+        <text {...selectionColors(props.theme)} fg={props.theme.accent} flexShrink={0} height={1}>
           Keyboard shortcuts
         </text>
         <input
           focused
           placeholder="Search actions or keys…"
           flexShrink={0}
-          textColor={props.theme.text}
-          backgroundColor={props.theme.panel}
-          focusedBackgroundColor={props.theme.panel}
+          {...editorColors(props.theme)}
           onInput={value => {
             setQuery(value);
             scroll?.scrollTo(0);
           }}
         />
-        <scrollbox ref={scroll} scrollY flexGrow={1} minHeight={0}>
+        <scrollbox
+          ref={scroll}
+          scrollY
+          flexGrow={1}
+          minHeight={0}
+          scrollbarOptions={scrollbarColors(props.theme)}
+        >
           <For each={groups()}>
             {group => (
               <box flexDirection="column" flexShrink={0}>
-                <text fg={props.theme.accent} marginTop={1}>
+                <text {...selectionColors(props.theme)} fg={props.theme.accent} marginTop={1}>
                   {group.title}
                 </text>
                 <For each={group.actions}>
                   {id => (
                     <box flexDirection="column" flexShrink={0}>
-                      <text fg={props.theme.text}>{keyDescriptions[id]}</text>
-                      <text fg={props.theme.muted}> {props.keys.label(id) || "Unbound"}</text>
+                      <text {...selectionColors(props.theme)} fg={props.theme.text}>
+                        {keyDescriptions[id]}
+                      </text>
+                      <text {...selectionColors(props.theme)} fg={props.theme.muted}>
+                        {" "}
+                        {props.keys.label(id) || "Unbound"}
+                      </text>
                     </box>
                   )}
                 </For>
@@ -127,10 +136,12 @@ export function KeyboardHelp(props: {
             )}
           </For>
           <Show when={!groups().length}>
-            <text fg={props.theme.muted}>No matching shortcuts</text>
+            <text {...selectionColors(props.theme)} fg={props.theme.muted}>
+              No matching shortcuts
+            </text>
           </Show>
         </scrollbox>
-        <text fg={props.theme.muted} flexShrink={0} maxHeight={2}>
+        <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0} maxHeight={2}>
           {props.keys.hint("help.previous", "up")} · {props.keys.hint("help.next", "down")} ·{" "}
           {props.keys.hint("app.cancel", "close")}
         </text>

@@ -10,7 +10,8 @@ import { projectFiles } from "../files";
 import { appPaths } from "../config";
 import { resolveKeybindings, type KeyAction, type KeyContext } from "../keybindings";
 import { consumeKey, suppressEditorFallback } from "./keybindings";
-import { syntaxStyle, themes, type ThemeName } from "./theme";
+import { syntaxStyle, editorColors, scrollbarColors, selectionColors } from "./theme";
+import { initialTheme, resolveThemes } from "../themes";
 import { Picker, type Choice } from "./picker";
 import { InteractionView } from "./interaction";
 import { TimelineEntry } from "./timeline";
@@ -25,15 +26,18 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const renderer = useRenderer();
   const dimensions = useTerminalDimensions();
   const [state, setState] = createStore<Snapshot>(controller.snapshot());
-  const initialTheme = controller.storage.setting<ThemeName>("theme", "dark");
-  const [themeName, setThemeName] = createSignal<ThemeName>(
-    initialTheme in themes ? initialTheme : "dark",
+  const registry = resolveThemes(controller.config);
+  const [themeName, setThemeName] = createSignal(
+    initialTheme(controller.config, controller.storage.setting("theme", "dark"), registry),
   );
-  const theme = () => themes[themeName()];
-  const styles = {
-    dark: syntaxStyle(renderer, themes.dark),
-    light: syntaxStyle(renderer, themes.light),
-  };
+  const theme = () => registry[themeName()]!.theme;
+  // Lazily allocate native styles; keep visited styles alive until all consumers unmount.
+  const styles = new Map<string, ReturnType<typeof syntaxStyle>>();
+  const style = createMemo(() => {
+    const name = themeName();
+    if (!styles.has(name)) styles.set(name, syntaxStyle(renderer, theme()));
+    return styles.get(name)!;
+  });
   const [sidebar, setSidebar] = createSignal(controller.storage.setting("sidebar", true));
   const [expanded, setExpanded] = createSignal(false);
   const [thoughts, setThoughts] = createSignal(false);
@@ -93,8 +97,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   });
   onCleanup(() => {
     controller.off("change", listener);
-    styles.dark.destroy();
-    styles.light.destroy();
+    for (const style of styles.values()) style.destroy();
   });
 
   const showAgents = () =>
@@ -173,10 +176,25 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     setSidebar(value => !value);
     controller.storage.setSetting("sidebar", sidebar());
   };
-  const toggleTheme = () => {
-    setThemeName(name => (name === "dark" ? "light" : "dark"));
-    controller.storage.setSetting("theme", themeName());
-  };
+  const showThemes = () =>
+    setPalette({
+      title: "Choose theme",
+      choices: Object.entries(registry).map(([id, preset]) => ({
+        id,
+        label: preset.label,
+        detail: [
+          id,
+          id === themeName() ? "current" : "",
+          Object.hasOwn(controller.config.themes ?? {}, id) ? "custom" : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        run: () => {
+          setThemeName(id);
+          controller.storage.setSetting("theme", id);
+        },
+      })),
+    });
   const clientCommands = (): Choice[] =>
     [
       { id: "help", label: "Keyboard shortcuts", run: showHelp },
@@ -218,7 +236,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         run: () => setExpanded(value => !value),
       },
       { id: "thoughts", label: "Show / hide reasoning", run: () => setThoughts(value => !value) },
-      { id: "theme", label: "Toggle light / dark theme", run: toggleTheme },
+      { id: "theme", label: "Choose theme", run: showThemes },
       { id: "earlier", label: "Show earlier messages", run: () => setLimit(value => value + 200) },
       {
         id: "export",
@@ -409,7 +427,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   });
 
   return (
-    <box width="100%" height="100%" flexDirection="column" backgroundColor={theme().bg}>
+    <box width="100%" height="100%" flexDirection="column" backgroundColor={theme().background}>
       <box
         height={2}
         flexShrink={0}
@@ -417,9 +435,13 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         justifyContent="space-between"
         flexDirection="row"
       >
-        <text fg={theme().accent}>ACP TUI / {basename(state.session.cwd)}</text>
-        <text fg={theme().text}>{state.session.title}</text>
-        <text fg={theme().muted}>
+        <text {...selectionColors(theme())} fg={theme().accent}>
+          ACP TUI / {basename(state.session.cwd)}
+        </text>
+        <text {...selectionColors(theme())} fg={theme().text}>
+          {state.session.title}
+        </text>
+        <text {...selectionColors(theme())} fg={theme().muted}>
           {state.agentName ?? state.session.agent} · {state.status}
         </text>
       </box>
@@ -432,24 +454,33 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           stickyScroll
           stickyStart="bottom"
           contentOptions={{ paddingX: 1 }}
+          scrollbarOptions={scrollbarColors(theme())}
         >
           <Show when={!state.session.items.length}>
             <box flexDirection="column" padding={2} gap={1}>
-              <text fg={theme().accent}>What would you like to build?</text>
-              <text fg={theme().muted}>One interface for your coding agents.</text>
-              <text fg={theme().text}>
+              <text {...selectionColors(theme())} fg={theme().accent}>
+                What would you like to build?
+              </text>
+              <text {...selectionColors(theme())} fg={theme().muted}>
+                One interface for your coding agents.
+              </text>
+              <text {...selectionColors(theme())} fg={theme().text}>
                 Type a prompt below. {hint("app.commands", "commands")} ·{" "}
                 {hint("app.agents", "agents")}
               </text>
               <Show when={state.session.agent === "demo"}>
-                <text fg={theme().warning}>
+                <text {...selectionColors(theme())} fg={theme().warning}>
                   Offline demo · simulated edits · try /help, /question or /slow
                 </text>
               </Show>
             </box>
           </Show>
           <Show when={state.session.items.length > limit()}>
-            <text fg={theme().muted} onMouseDown={() => setLimit(value => value + 200)}>
+            <text
+              {...selectionColors(theme())}
+              fg={theme().muted}
+              onMouseDown={() => setLimit(value => value + 200)}
+            >
               Earlier messages hidden · “Show earlier messages” in the command palette (
               {hint("app.commands", "commands")})
             </text>
@@ -459,7 +490,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
               <TimelineEntry
                 item={item}
                 theme={theme()}
-                syntax={styles[themeName()]}
+                syntax={style()}
                 expanded={expanded()}
                 thoughts={thoughts()}
                 streaming={state.status === "working" && item.id === state.session.items.at(-1)?.id}
@@ -468,7 +499,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
             )}
           </For>
           <Show when={state.status === "working" || state.status === "cancelling"}>
-            <text fg={theme().accent}>
+            <text {...selectionColors(theme())} fg={theme().accent}>
               {state.status === "working"
                 ? `Working… · ${hint("app.cancel", "to cancel")}`
                 : `Cancelling… · ${hint("app.cancel", "to disconnect")}`}
@@ -483,57 +514,72 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
             borderColor={theme().border}
             paddingX={1}
             scrollY
+            scrollbarOptions={scrollbarColors(theme())}
           >
-            <text fg={theme().accent}>{state.session.title}</text>
-            <text fg={theme().muted}>{state.session.agent}</text>
+            <text {...selectionColors(theme())} fg={theme().accent}>
+              {state.session.title}
+            </text>
+            <text {...selectionColors(theme())} fg={theme().muted}>
+              {state.session.agent}
+            </text>
             <For each={state.session.configOptions}>
               {option => (
-                <text fg={theme().muted}>
+                <text {...selectionColors(theme())} fg={theme().muted}>
                   {option.name}: {String(option.currentValue)}
                 </text>
               )}
             </For>
             <Show when={!state.session.configOptions.length && state.session.modes}>
-              <text fg={theme().muted}>Mode: {state.session.modes?.currentModeId}</text>
+              <text {...selectionColors(theme())} fg={theme().muted}>
+                Mode: {state.session.modes?.currentModeId}
+              </text>
             </Show>
             <Show when={state.session.usage}>
-              <text fg={theme().muted}>
+              <text {...selectionColors(theme())} fg={theme().muted}>
                 Context: {state.session.usage?.used.toLocaleString()} /{" "}
                 {state.session.usage?.size.toLocaleString()}
               </text>
             </Show>
             <Show when={state.session.usage}>
-              <text fg={theme().muted}>
+              <text {...selectionColors(theme())} fg={theme().muted}>
                 Reported cost:{"\n"}
                 {formatCost(state.session.usage?.cost)}
               </text>
             </Show>
             <Show when={state.session.plan.length}>
-              <text fg={theme().accent} marginTop={1}>
+              <text {...selectionColors(theme())} fg={theme().accent} marginTop={1}>
                 Plan
               </text>
             </Show>
             <For each={state.session.plan}>
               {entry => (
-                <text fg={entry.status === "completed" ? theme().muted : theme().text}>
+                <text
+                  {...selectionColors(theme())}
+                  fg={entry.status === "completed" ? theme().muted : theme().text}
+                >
                   {entry.status === "completed" ? "✓" : entry.status === "in_progress" ? "›" : "○"}{" "}
                   {entry.content}
                 </text>
               )}
             </For>
             <Show when={changedFiles(state.session).length}>
-              <text fg={theme().accent} marginTop={1}>
+              <text {...selectionColors(theme())} fg={theme().accent} marginTop={1}>
                 Reported diffs
               </text>
             </Show>
             <For each={changedFiles(state.session)}>
-              {path => <text fg={theme().muted}>{relative(state.session.cwd, path)}</text>}
+              {path => (
+                <text {...selectionColors(theme())} fg={theme().muted}>
+                  {relative(state.session.cwd, path)}
+                </text>
+              )}
             </For>
           </scrollbox>
         </Show>
       </box>
       <Show when={state.error || notice()}>
         <text
+          {...selectionColors(theme())}
           fg={state.error ? theme().error : theme().muted}
           paddingX={1}
           maxHeight={3}
@@ -570,7 +616,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       </Show>
       <box
         border
-        borderColor={busy() ? theme().accent : theme().border}
+        borderColor={busy() ? theme().focusBorder : theme().border}
         backgroundColor={theme().panel}
         flexDirection="column"
         paddingX={1}
@@ -578,7 +624,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       >
         <Show when={mode()}>
           {current => (
-            <text fg={theme().accent} maxHeight={1}>
+            <text {...selectionColors(theme())} fg={theme().accent} maxHeight={1}>
               {current().name}:{" "}
               {current().options.find(option => option.value === current().currentValue)?.name ??
                 String(current().currentValue)}
@@ -587,7 +633,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           )}
         </Show>
         <Show when={attachments().length}>
-          <text fg={theme().accent} maxHeight={2}>
+          <text {...selectionColors(theme())} fg={theme().accent} maxHeight={2}>
             Attached: {attachments().join(", ")}
           </text>
         </Show>
@@ -600,15 +646,11 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
               ? "Compose your next message…"
               : `Ask anything · / commands · @ then ${hint("composer.complete", "to attach a file")}`
           }
-          textColor={theme().text}
-          focusedTextColor={theme().text}
-          backgroundColor={theme().panel}
-          focusedBackgroundColor={theme().panel}
-          cursorColor={theme().accent}
+          {...editorColors(theme())}
           onContentChange={() => setDraft(editor?.plainText ?? "")}
         />
         <Show when={completions().length}>
-          <text fg={theme().muted} maxHeight={1}>
+          <text {...selectionColors(theme())} fg={theme().muted} maxHeight={1}>
             {completions().join("  ")} · {hint("composer.complete", "complete")}
           </text>
         </Show>

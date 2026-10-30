@@ -451,8 +451,8 @@ test("help preserves picker filtering, selection and focus", async () => {
   try {
     await setup.mockInput.typeText("draft");
     setup.mockInput.pressKey("p", { ctrl: true });
-    await setup.mockInput.typeText("Toggle");
-    setup.mockInput.pressArrow("down"); // Theme after sidebar.
+    await setup.mockInput.typeText("Show");
+    setup.mockInput.pressArrow("down"); // Reasoning after session usage.
     setup.mockInput.pressKey("F1");
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Current context · Pickers");
@@ -462,10 +462,10 @@ test("help preserves picker filtering, selection and focus", async () => {
     setup.mockInput.pressKey("ESCAPE");
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Command palette");
-    expect(setup.captureCharFrame()).toContain("› Toggle light / dark theme");
+    expect(setup.captureCharFrame()).toContain("› Show / hide reasoning");
     setup.mockInput.pressEnter();
     await setup.renderOnce();
-    expect(setup.storage.setting("theme", "dark")).toBe("light");
+    expect(setup.captureCharFrame()).not.toContain("Command palette");
     await setup.mockInput.typeText("!");
     setup.mockInput.pressEnter();
     expect(setup.prompts).toEqual(["draft!"]);

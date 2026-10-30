@@ -2,7 +2,8 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { createTwoFilesPatch } from "diff";
 import type { SyntaxStyle } from "@opentui/core";
 import { contentText, type TimelineItem, type Tool } from "../state";
-import type { Theme } from "./theme";
+import { selectionColors, type Theme } from "./theme";
+import { ThemedMarkdown } from "./markdown";
 
 function ToolCard(props: {
   tool: Tool;
@@ -27,6 +28,7 @@ function ToolCard(props: {
       flexShrink={0}
     >
       <text
+        {...selectionColors(props.theme)}
         fg={props.tool.status === "failed" ? props.theme.error : props.theme.accent}
         onMouseDown={() => setOverride(!expanded())}
       >
@@ -38,7 +40,7 @@ function ToolCard(props: {
             <>
               <Show when={content.type === "content" ? content : undefined} keyed>
                 {block => (
-                  <text fg={props.theme.text} selectable>
+                  <text fg={props.theme.text} selectable {...selectionColors(props.theme)}>
                     {contentText(block.content)}
                   </text>
                 )}
@@ -46,7 +48,9 @@ function ToolCard(props: {
               <Show when={content.type === "diff" ? content : undefined} keyed>
                 {block => (
                   <box flexDirection="column">
-                    <text fg={props.theme.muted}>{block.path}</text>
+                    <text {...selectionColors(props.theme)} fg={props.theme.muted}>
+                      {block.path}
+                    </text>
                     <diff
                       diff={createTwoFilesPatch(
                         block.path,
@@ -57,9 +61,19 @@ function ToolCard(props: {
                       view="unified"
                       syntaxStyle={props.syntax}
                       fg={props.theme.text}
-                      addedBg={props.theme.added}
-                      removedBg={props.theme.removed}
-                      contextBg={props.theme.bg}
+                      {...selectionColors(props.theme)}
+                      addedBg={props.theme.diffAddedBackground}
+                      removedBg={props.theme.diffRemovedBackground}
+                      contextBg={props.theme.diffContextBackground}
+                      addedContentBg={props.theme.diffAddedContentBackground}
+                      removedContentBg={props.theme.diffRemovedContentBackground}
+                      contextContentBg={props.theme.diffContextContentBackground}
+                      addedSignColor={props.theme.diffAddedSign}
+                      removedSignColor={props.theme.diffRemovedSign}
+                      lineNumberFg={props.theme.diffLineNumber}
+                      lineNumberBg={props.theme.diffLineNumberBackground}
+                      addedLineNumberBg={props.theme.diffAddedLineNumberBackground}
+                      removedLineNumberBg={props.theme.diffRemovedLineNumberBackground}
                       wrapMode="word"
                     />
                   </box>
@@ -67,7 +81,7 @@ function ToolCard(props: {
               </Show>
               <Show when={content.type === "terminal" ? content : undefined} keyed>
                 {block => (
-                  <text fg={props.theme.text} selectable>
+                  <text fg={props.theme.text} selectable {...selectionColors(props.theme)}>
                     {props.terminals[block.terminalId] ?? "Terminal output is no longer available."}
                   </text>
                 )}
@@ -76,7 +90,7 @@ function ToolCard(props: {
           )}
         </For>
         <Show when={!props.tool.content?.length && raw()}>
-          <text fg={props.theme.muted} maxHeight={40} selectable>
+          <text fg={props.theme.muted} maxHeight={40} selectable {...selectionColors(props.theme)}>
             {raw().slice(0, 16000)}
           </text>
         </Show>
@@ -117,7 +131,10 @@ export function TimelineEntry(props: {
       >
         {message => (
           <box flexDirection="column" marginBottom={1} paddingX={1} flexShrink={0}>
-            <text fg={message.role === "user" ? props.theme.accent : props.theme.muted}>
+            <text
+              {...selectionColors(props.theme)}
+              fg={message.role === "user" ? props.theme.accent : props.theme.muted}
+            >
               {message.role === "user"
                 ? "You"
                 : message.role === "agent"
@@ -136,15 +153,16 @@ export function TimelineEntry(props: {
                       : props.theme.text
                   }
                   selectable
+                  {...selectionColors(props.theme)}
                 >
                   {message.text}
                 </text>
               }
             >
-              <markdown
+              <ThemedMarkdown
                 content={message.text}
-                syntaxStyle={props.syntax}
-                fg={props.theme.text}
+                syntax={props.syntax}
+                theme={props.theme}
                 streaming={props.streaming}
               />
             </Show>

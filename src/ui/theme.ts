@@ -1,49 +1,66 @@
-import { SyntaxStyle, type CliRenderer } from "@opentui/core";
+import { SyntaxStyle, type CliRenderer, type StyleDefinitionInput } from "@opentui/core";
+import { themePresets, type Theme } from "../themes";
 
-export const themes = {
-  dark: {
-    bg: "#10151d",
-    panel: "#18212d",
-    border: "#344357",
-    text: "#d9e2f0",
-    muted: "#91a0b5",
-    accent: "#7dd3c7",
-    warning: "#f2c879",
-    error: "#f18b9c",
-    added: "#16392e",
-    removed: "#40242e",
-  },
-  light: {
-    bg: "#f4f6fa",
-    panel: "#e6ebf2",
-    border: "#a4afbf",
-    text: "#263346",
-    muted: "#586a80",
-    accent: "#096f66",
-    warning: "#896000",
-    error: "#ad2748",
-    added: "#d2ecdf",
-    removed: "#f5dce1",
-  },
-};
-export type ThemeName = keyof typeof themes;
-export type Theme = typeof themes.dark;
+export type { Theme } from "../themes";
+// Convenient defaults for isolated component rendering.
+export const themes = { dark: themePresets.dark.theme, light: themePresets.light.theme };
+
 export function syntaxStyle(renderer: CliRenderer, theme: Theme) {
+  const m = theme.markdown;
+  const styles: Record<string, StyleDefinitionInput> = Object.fromEntries(
+    Object.entries(theme.syntax).map(([name, fg]) => [name, { fg }]),
+  );
+  // OpenTUI falls back to the first scope segment, not its immediate parent.
+  for (let level = 1; level <= 6; level++)
+    styles[`markup.heading.${level}`] = { fg: m.heading, bold: true };
   return SyntaxStyle.fromStyles(
     {
-      default: { fg: theme.text },
-      "markup.heading": { fg: theme.accent, bold: true },
-      "markup.strong": { bold: true },
-      "markup.italic": { italic: true },
-      "markup.link": { fg: theme.accent, underline: true },
-      "markup.raw": { fg: theme.warning },
-      keyword: { fg: theme.accent },
-      string: { fg: theme.warning },
-      comment: { fg: theme.muted, italic: true },
-      number: { fg: theme.error },
-      function: { fg: theme.accent },
-      type: { fg: theme.warning },
+      ...styles,
+      comment: { fg: theme.syntax.comment, italic: true },
+      "markup.heading": { fg: m.heading, bold: true },
+      "markup.strong": { fg: m.strong, bold: true },
+      "markup.italic": { fg: m.italic, italic: true },
+      "markup.strikethrough": { fg: m.strikethrough },
+      "markup.link": { fg: m.link, underline: true },
+      "markup.link.label": { fg: m.link, underline: true },
+      "markup.link.bracket.close": { fg: m.link, underline: true },
+      "markup.link.url": { fg: m.linkUrl, underline: true },
+      "string.special.url": { fg: m.linkUrl, underline: true },
+      "markup.raw": { fg: m.raw, bg: m.rawBackground },
+      "markup.raw.block": { fg: theme.syntax.default, bg: m.codeBackground },
+      "markup.quote": { fg: m.quote },
+      "markup.list": { fg: m.list },
+      "markup.list.checked": { fg: m.list },
+      "markup.list.unchecked": { fg: m.list },
+      conceal: { fg: m.conceal },
     },
     renderer.nativeScene,
   );
+}
+
+export function editorColors(theme: Theme) {
+  return {
+    textColor: theme.inputText,
+    focusedTextColor: theme.inputFocusedText,
+    backgroundColor: theme.inputBackground,
+    focusedBackgroundColor: theme.inputFocusedBackground,
+    placeholderColor: theme.placeholder,
+    cursorColor: theme.cursor,
+    selectionBg: theme.selectionBackground,
+    selectionFg: theme.selectionText,
+  };
+}
+
+export function selectionColors(theme: Theme) {
+  return { selectionBg: theme.selectionBackground, selectionFg: theme.selectionText };
+}
+
+export function scrollbarColors(theme: Theme) {
+  return {
+    trackOptions: { backgroundColor: theme.scrollbarTrack, foregroundColor: theme.scrollbarThumb },
+    arrowOptions: {
+      backgroundColor: theme.scrollbarArrowBackground,
+      foregroundColor: theme.scrollbarArrow,
+    },
+  };
 }

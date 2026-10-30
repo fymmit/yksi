@@ -37,6 +37,8 @@ from other directories. Bundles require the preload too (see README).
 
 - `src/index.tsx`: CLI parsing, terminal lifecycle, application wiring.
 - `src/config.ts`: validated global agent definitions, XDG paths, demo launch.
+- `src/themes.ts`: renderer-independent theme schema, thirteen built-in palettes,
+  custom preset overrides, and startup selection precedence.
 - `src/keybindings.ts`: typed action/default/context registry, validated global
   overrides, exact key matching, and shortcut labels.
 - `src/modes.ts`: semantic mode selection, preferring categorized config options
@@ -52,6 +54,10 @@ from other directories. Bundles require the preload too (see README).
   reserved help hint. `help.tsx` renders searchable floating keyboard help from
   the keybinding registry's descriptions and resolved alternatives.
   `usage.ts` formats reported session cost and the local `/tui:usage` summary.
+  `theme.ts` maps resolved colors to native syntax/editor/scrollbar styles.
+  `markdown.tsx` themes Markdown selection, tables and fenced backgrounds while
+  preserving incremental prose rendering (OpenTUI 0.8's `codeBlockOnly` hook flag
+  preserves coalescing; cover this compatibility behavior when upgrading).
   `form.tsx` and `form-state.ts` render and validate keyboard-driven elicitation
   forms, with checkbox multi-selects for finite-choice string arrays and JSON
   fallback for other arrays and unsupported widget types.
@@ -105,6 +111,14 @@ from other directories. Bundles require the preload too (see README).
   restore the terminal, close SQLite, and terminate owned process groups.
 - UI state/settings are local. Do not automatically execute project-local agent
   configuration. The only configuration is the global file or explicit --config.
+- Themes are startup-loaded global config: `theme` selects an explicit startup
+  theme; `themes` defines named overrides extending a built-in preset. Validate
+  names, references, token keys and #RRGGBB values. Resolve startup selection as
+  explicit config, valid saved SQLite `theme`, then `dark`. Preserve existing
+  dark/light settings. Picker changes apply immediately and persist, but explicit
+  config wins again on restart. All UI, input/selection, scrollbar, Markdown,
+  syntax and diff colors come from resolved tokens. Native syntax styles are
+  allocated lazily per visited theme and destroyed on app cleanup.
 - Keybindings are startup-loaded overrides in that configuration: omitted actions
   inherit defaults, arrays replace shortcuts, and `[]` disables them. Contexts
   permit key reuse only where actions cannot overlap. Keep handlers and hints
@@ -139,6 +153,11 @@ Implemented: stdio agents, streaming Markdown, tool cards/diffs, client file and
 terminal services, permissions, form/URL elicitation, cancellation, local session
 history and advertised resumption, file attachments, dynamic agent commands and
 configuration, configurable keybindings, themes, sidebar, export and offline demo.
+**Choose theme**, `/tui:theme`, and the unbound-by-default `app.theme` open a
+searchable picker for built-in and custom themes. Built-ins include Dark/Light,
+Gruvbox Dark/Light, all four Catppuccin flavors, GitHub Dark/Light, Dracula, Nord,
+and Tokyo Night. Theme switching preserves drafts, focus and timeline IDs;
+Escape cancels the picker and help preserves its filter/selection.
 The footer summarizes settings, context/cost, completed/total plan steps, and
 reported-diff file count. At 100+ columns every displayed field has a label;
 below 100 columns fields show values only, including legacy modes, except boolean

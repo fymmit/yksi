@@ -35,9 +35,12 @@ test("keyboard palette preserves the draft, filters and closes; narrow layout ke
     setup.mockInput.pressKey("p", { ctrl: true });
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Command palette");
-    await setup.mockInput.typeText("Toggle light");
+    await setup.mockInput.typeText("Choose theme");
     await setup.renderOnce();
-    expect(setup.captureCharFrame()).toContain("Toggle light / dark theme");
+    expect(setup.captureCharFrame()).toContain("Choose theme");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
+    await setup.mockInput.typeText("Light");
     setup.mockInput.pressEnter();
     await setup.renderOnce();
     expect(storage.setting("theme", "dark")).toBe("light");

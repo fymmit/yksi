@@ -2,7 +2,7 @@ import { createSignal, For, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { ElicitationContentValue } from "@agentclientprotocol/sdk";
 import type { Interaction } from "../controller";
-import type { Theme } from "./theme";
+import { selectionColors, type Theme } from "./theme";
 import { FormView } from "./form";
 import { defaultKeybindings, type Keybindings, type KeyContext } from "../keybindings";
 import { consumeKey } from "./keybindings";
@@ -55,16 +55,16 @@ export function InteractionView(props: {
       flexShrink={0}
       maxHeight="60%"
     >
-      <text fg={props.theme.warning} flexShrink={0}>
+      <text {...selectionColors(props.theme)} fg={props.theme.warning} flexShrink={0}>
         {props.interaction.title}
       </text>
       <Show when={props.interaction.description}>
-        <text fg={props.theme.muted} flexShrink={0}>
+        <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
           {props.interaction.description}
         </text>
       </Show>
       <Show when={props.interaction.url}>
-        <text fg={props.theme.accent} flexShrink={0} selectable>
+        <text fg={props.theme.accent} flexShrink={0} selectable {...selectionColors(props.theme)}>
           {props.interaction.url}
         </text>
       </Show>
@@ -75,6 +75,7 @@ export function InteractionView(props: {
             <For each={props.interaction.options}>
               {(option, i) => (
                 <text
+                  {...selectionColors(props.theme)}
                   fg={i() === index() ? props.theme.accent : props.theme.text}
                   onMouseDown={() => {
                     if (props.active !== false) props.answer(option.id);
@@ -85,7 +86,7 @@ export function InteractionView(props: {
                 </text>
               )}
             </For>
-            <text fg={props.theme.muted}>
+            <text {...selectionColors(props.theme)} fg={props.theme.muted}>
               {keys.hint("permission.previous", "previous")} ·{" "}
               {keys.hint("permission.next", "next")} · {keys.hint("permission.confirm", "confirm")}{" "}
               · {keys.hint("app.cancel", "cancel")}
