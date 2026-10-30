@@ -80,7 +80,7 @@ export class Controller extends EventEmitter {
       }, 500);
   }
   private persist() {
-    if (this.session.remoteId || this.session.items.length || this.session.inputHistory?.length)
+    if (this.session.items.some(item => item.type === "tool" || item.role !== "system"))
       this.storage.save(this.session);
   }
   report(error: unknown) {

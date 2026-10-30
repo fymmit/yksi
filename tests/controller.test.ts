@@ -25,6 +25,67 @@ function setup() {
   };
 }
 
+test("an unused remote session is not saved while open, on switch, or on exit", async () => {
+  const { controller, dispose } = setup();
+  try {
+    await controller.open();
+    expect(controller.status).toBe("ready");
+    expect(controller.session.remoteId).toBeTruthy();
+    await Bun.sleep(550); // Let the debounced persistence timer run.
+    expect(controller.storage.list(controller.cwd)).toEqual([]);
+
+    const firstId = controller.session.id;
+    await controller.open();
+    expect(controller.session.id).not.toBe(firstId);
+    expect(controller.storage.list(controller.cwd)).toEqual([]);
+
+    controller.dispose();
+    expect(controller.storage.list(controller.cwd)).toEqual([]);
+  } finally {
+    dispose();
+  }
+});
+
+test("local commands, settings, and notices do not save a session without conversation", async () => {
+  const { controller, dispose } = setup();
+  try {
+    await controller.open();
+    controller.recordInput("/tui:usage");
+    await controller.setMode("plan");
+    const events = Reflect.get(controller.client!, "events") as ClientEvents;
+    events.update({
+      sessionId: controller.session.remoteId!,
+      update: { sessionUpdate: "notice", severity: "info", title: "Connected" },
+    });
+    expect(controller.session.items).toHaveLength(1);
+    expect(controller.storage.list(controller.cwd)).toEqual([]);
+
+    await controller.open();
+    expect(controller.storage.list(controller.cwd)).toEqual([]);
+  } finally {
+    dispose();
+  }
+});
+
+test("the first prompt saves a session, including previously entered local commands", async () => {
+  const { controller, dispose } = setup();
+  try {
+    await controller.open();
+    controller.recordInput("/tui:usage");
+    await controller.send("/help");
+    const saved = controller.storage.list(controller.cwd)[0];
+    expect(saved?.id).toBe(controller.session.id);
+    expect(saved?.inputHistory).toEqual([
+      { text: "/tui:usage", attachments: [] },
+      { text: "/help", attachments: [] },
+    ]);
+    await controller.open();
+    expect(controller.storage.list(controller.cwd)).toHaveLength(1);
+  } finally {
+    dispose();
+  }
+});
+
 test("stdio handshake, command discovery, permission, streamed tool output and persistence", async () => {
   const { controller, dispose } = setup();
   try {
