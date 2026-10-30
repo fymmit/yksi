@@ -5,7 +5,7 @@ import { defaultKeybindings, type Keybindings } from "../keybindings";
 import { consumeKey, suppressEditorFallback } from "./keybindings";
 
 export type Choice = { id: string; label: string; detail?: string; run: () => unknown };
-export function Picker(props: { title: string; choices: Choice[]; theme: Theme; keys?: Keybindings; height: number; close: () => void; error: (error: unknown) => void }) {
+export function Picker(props: { title: string; choices: Choice[]; theme: Theme; keys?: Keybindings; active?: boolean; height: number; close: () => void; error: (error: unknown) => void }) {
   const keys = props.keys ?? defaultKeybindings;
   const [query, setQuery] = createSignal("");
   const [index, setIndex] = createSignal(0);
@@ -16,12 +16,12 @@ export function Picker(props: { title: string; choices: Choice[]; theme: Theme; 
     return choices().slice(start, start + size);
   });
   const select = (choice?: Choice) => {
-    if (!choice) return;
+    if (!choice || props.active === false) return;
     props.close();
     try { void Promise.resolve(choice.run()).catch(props.error); } catch (error) { props.error(error); }
   };
   useKeyboard(key => {
-    if (key.defaultPrevented) return;
+    if (key.defaultPrevented || props.active === false) return;
     if (keys.matches("app.cancel", key)) { if (consumeKey(key)) props.close(); return; }
     if (keys.matches("picker.previous", key) || keys.matches("picker.next", key)) {
       if (consumeKey(key, true)) setIndex(i => Math.max(0, Math.min(choices().length - 1, i + (keys.matches("picker.previous", key) ? -1 : 1))));
@@ -30,7 +30,7 @@ export function Picker(props: { title: string; choices: Choice[]; theme: Theme; 
   });
   return <box flexDirection="column" border borderColor={props.theme.accent} backgroundColor={props.theme.panel} paddingX={1} flexShrink={0}>
     <text fg={props.theme.accent}>{props.title} · {keys.hint("app.cancel", "close")}</text>
-    <input focused placeholder="Type to filter…" onInput={value => { setQuery(value); setIndex(0); }} textColor={props.theme.text} backgroundColor={props.theme.panel} focusedBackgroundColor={props.theme.panel} />
+    <input focused={props.active !== false} placeholder="Type to filter…" onInput={value => { setQuery(value); setIndex(0); }} textColor={props.theme.text} backgroundColor={props.theme.panel} focusedBackgroundColor={props.theme.panel} />
     <For each={visible()}>{choice => <box onMouseDown={() => select(choice)} flexDirection="column" backgroundColor={choices()[index()]?.id === choice.id ? props.theme.border : props.theme.panel}>
       <text fg={props.theme.text}>{choices()[index()]?.id === choice.id ? "› " : "  "}{choice.label}</text>
       <Show when={choice.detail}><text fg={props.theme.muted} maxHeight={1}>  {choice.detail}</text></Show>

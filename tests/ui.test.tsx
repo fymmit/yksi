@@ -40,7 +40,7 @@ test("keyboard palette preserves the draft, filters and closes; narrow layout ke
     setup.resize(60, 20);
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Keep this draft");
-    expect(setup.captureCharFrame()).toContain("Enter send");
+    expect(setup.captureCharFrame()).toContain("F1 Help");
   } finally { controller.dispose(); await setup.dispose(); storage.close(); }
 });
 

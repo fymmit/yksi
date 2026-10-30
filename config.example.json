@@ -1,7 +1,7 @@
 {
   "defaultAgent": "copilot",
   "keybindings": {
-    "app.commands": ["ctrl+p", "f1"],
+    "app.commands": ["ctrl+p", "f2"],
     "composer.submit": ["enter"],
     "composer.newline": ["shift+enter", "alt+enter"]
   },

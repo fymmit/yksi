@@ -179,8 +179,7 @@ test("composer remaps submit and newline without inheriting removed editor bindi
     setup.mockInput.pressEnter({ ctrl: true });
     await setup.renderOnce();
     expect(setup.prompts).toEqual(["hello\nworld!"]);
-    expect(setup.captureCharFrame()).toContain("Ctrl+Enter send");
-    expect(setup.captureCharFrame()).toContain("Enter newline");
+    expect(setup.captureCharFrame()).toContain("F1 Help");
     await setup.mockInput.pressKeys(["n", "e", "x", "t"], 0);
     setup.mockInput.pressEnter({ ctrl: true });
     expect(setup.prompts).toEqual(["hello\nworld!", "next"]);
@@ -199,7 +198,7 @@ test("disabled submit and newline do not fall through to textarea defaults", asy
     await setup.renderOnce();
     expect(setup.prompts).toEqual([]);
     expect(setup.captureCharFrame()).toContain("ab");
-    expect(setup.captureCharFrame()).toContain("send (unbound)");
+    expect(setup.captureCharFrame()).toContain("F1 Help");
   } finally { await setup.cleanup(); }
 });
 

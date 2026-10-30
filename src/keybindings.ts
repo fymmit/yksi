@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-export type KeyContext = "composer" | "picker" | "permission" | "form.text" | "form.choice" | "form.json";
+export type KeyContext = "composer" | "picker" | "permission" | "form.text" | "form.choice" | "form.json" | "help";
 const all: KeyContext[] = ["composer", "picker", "permission", "form.text", "form.choice", "form.json"];
+const global: KeyContext[] = [...all, "help"];
 const form: KeyContext[] = ["form.text", "form.choice", "form.json"];
 const questions: KeyContext[] = ["form.text", "form.choice"];
 const action = (contexts: KeyContext[], ...keys: string[]) => ({ contexts, keys });
@@ -9,6 +10,7 @@ const action = (contexts: KeyContext[], ...keys: string[]) => ({ contexts, keys 
 /** Stable configuration IDs. Contexts describe where actions can consume a key. */
 export const keyActions = {
   "app.commands": action(["composer"], "ctrl+p"),
+  "app.help": action(global, "f1"),
   "app.sessions": action(["composer"], "ctrl+s"),
   "app.agents": action(["composer"], "ctrl+a"),
   "app.new": action(["composer"], "ctrl+n"),
@@ -17,9 +19,9 @@ export const keyActions = {
   "app.files": action(["composer"], "ctrl+f"),
   "app.sidebar": action(["composer"], "ctrl+b"),
   "app.tools": action(all, "ctrl+o"),
-  "app.quit": action(all, "ctrl+q"),
-  "app.interrupt": action(all, "ctrl+c"),
-  "app.cancel": action(all, "escape"),
+  "app.quit": action(global, "ctrl+q"),
+  "app.interrupt": action(global, "ctrl+c"),
+  "app.cancel": action(global, "escape"),
   "app.scrollUp": action(["composer", "picker", "permission"], "pageup"),
   "app.scrollDown": action(["composer", "picker", "permission"], "pagedown"),
   "app.clear-attachments": action(["composer"]),
@@ -38,6 +40,10 @@ export const keyActions = {
   "picker.previous": action(["picker"], "up"),
   "picker.next": action(["picker"], "down"),
   "picker.confirm": action(["picker"], "enter"),
+  "help.previous": action(["help"], "up"),
+  "help.next": action(["help"], "down"),
+  "help.pageUp": action(["help"], "pageup"),
+  "help.pageDown": action(["help"], "pagedown"),
   "permission.previous": action(["permission"], "up"),
   "permission.next": action(["permission"], "down"),
   "permission.confirm": action(["permission"], "enter"),
@@ -57,6 +63,61 @@ export const keyActions = {
   "form.newline": action(["form.text"], "shift+enter", "alt+enter"),
 } satisfies Record<string, { contexts: KeyContext[]; keys: string[] }>;
 export type KeyAction = keyof typeof keyActions;
+/** Human-readable reference text, shared by the searchable shortcut window. */
+export const keyDescriptions: Record<KeyAction, string> = {
+  "app.commands": "Open command palette",
+  "app.help": "Keyboard shortcuts",
+  "app.sessions": "Switch session",
+  "app.agents": "Choose agent / new session",
+  "app.new": "New session",
+  "app.config": "Model, mode and agent settings",
+  "app.cycle-mode": "Cycle agent mode",
+  "app.files": "Attach a text file",
+  "app.sidebar": "Toggle sidebar",
+  "app.tools": "Expand / collapse tool details",
+  "app.quit": "Quit",
+  "app.interrupt": "Cancel while busy; otherwise quit",
+  "app.cancel": "Close help / picker, cancel interaction / turn, clear notice",
+  "app.scrollUp": "Scroll conversation up",
+  "app.scrollDown": "Scroll conversation down",
+  "app.clear-attachments": "Clear attachments",
+  "app.reconnect": "Reconnect current session",
+  "app.thoughts": "Show / hide reasoning",
+  "app.theme": "Toggle light / dark theme",
+  "app.earlier": "Show earlier messages",
+  "app.export": "Export transcript to Markdown",
+  "app.paths": "Show configuration and data paths",
+  "app.usage": "Show reported session usage",
+  "composer.submit": "Send prompt",
+  "composer.newline": "Insert newline",
+  "composer.complete": "Complete command / attach file after @",
+  "composer.historyPrevious": "Previous prompt from history",
+  "composer.historyNext": "Next prompt from history",
+  "picker.previous": "Previous choice",
+  "picker.next": "Next choice",
+  "picker.confirm": "Confirm choice",
+  "help.previous": "Scroll shortcuts up",
+  "help.next": "Scroll shortcuts down",
+  "help.pageUp": "Page shortcuts up",
+  "help.pageDown": "Page shortcuts down",
+  "permission.previous": "Previous permission option",
+  "permission.next": "Next permission option",
+  "permission.confirm": "Confirm permission option",
+  "form.decline": "Decline form",
+  "form.toggleJson": "Switch questions / JSON",
+  "form.submitJson": "Validate and submit JSON",
+  "form.jsonNewline": "Insert JSON newline",
+  "form.previous": "Previous question",
+  "form.next": "Next question",
+  "form.confirm": "Confirm answer and advance",
+  "form.clear": "Skip optional answer / clear required answer",
+  "form.optionPrevious": "Previous answer option",
+  "form.optionNext": "Next answer option",
+  "form.toggle": "Toggle checkbox",
+  "form.cursorLeft": "Move text cursor left",
+  "form.cursorRight": "Move text cursor right",
+  "form.newline": "Insert answer newline",
+};
 export type KeyOverrides = Partial<Record<KeyAction, string[]>>;
 export type KeyStroke = { name: string; ctrl?: boolean; shift?: boolean; meta?: boolean; super?: boolean; hyper?: boolean; baseCode?: number };
 

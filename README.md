@@ -53,6 +53,7 @@ You can also run `bun /absolute/path/to/acp-tui/bin/acp-tui.ts` from any directo
 - Cancellation, connection error reporting, explicit reconnect and process cleanup.
 - SQLite transcript history, supported remote resumption, Markdown export.
 - Responsive sidebar with agent plan, reported diffs, context usage and reported session cost when available.
+- Compact session status bar and searchable floating keyboard help.
 - Light/dark themes and sidebar preferences retained across runs.
 - Configurable, context-aware keyboard shortcuts with hints that follow your settings.
 
@@ -66,6 +67,7 @@ change them.
 | Enter | Send prompt |
 | Shift+Enter / Alt+Enter | Insert newline |
 | Ctrl+P | Command palette |
+| F1 | Open/close keyboard shortcut help |
 | Ctrl+N | New session |
 | Ctrl+S | Project session history |
 | Ctrl+A | Choose an agent, opening a new session |
@@ -78,13 +80,30 @@ change them.
 | Ctrl+O | Expand/collapse tool details, including during permissions |
 | Ctrl+B | Toggle sidebar (automatically hidden in narrow terminals) |
 | PageUp / PageDown | Scroll conversation |
-| Escape | Close picker, cancel an interaction, or cancel the active turn |
+| Escape | Close help/picker, cancel an interaction, or cancel the active turn |
 | Ctrl+C | Cancel while busy; otherwise quit |
 | Ctrl+Q | Quit |
 
 Arrow keys and Enter select in pickers and permission prompts. Tool headers are
 also clickable, and the conversation supports mouse scrolling. If Shift+Enter is
 not distinguishable in your terminal, use Alt+Enter.
+
+The bottom status bar summarizes the session title, agent, settings (prioritizing
+model and mode), reported context/cost, completed/total plan steps, and the number
+of files with reported diffs. It uses readable setting choices and compact counts.
+Narrow terminals shorten labels and omit lower-priority fields, keeping usage and
+the help shortcut visible when space permits. The sidebar shows the full details;
+it remains visible by default at **100 columns or wider**, respecting your saved
+visibility preference.
+
+**F1** opens a floating **Keyboard shortcuts** window. Type to search action names,
+action IDs, or configured keys; Up/Down and PageUp/PageDown scroll. Shortcuts for
+the context you opened it from appear first, followed by the other sections.
+All configured alternatives and unbound actions are included. F1 or Escape closes
+help and restores focus, drafts, and selections in the composer, picker, or form.
+Escape closes only help while it is open; Ctrl+C and Ctrl+Q retain their global
+behavior. The status bar's help hint is also clickable. Help is available through
+the command palette or `/tui:help`, including when `app.help` is unbound.
 
 You can compose the next prompt while an agent works; submit after the turn
 finishes. Cancellation waits up to five seconds, then disconnects an unresponsive
@@ -204,7 +223,7 @@ Add `keybindings` to the same global configuration file (or the file selected by
 ```json
 {
   "keybindings": {
-    "app.commands": ["ctrl+p", "f1"],
+    "app.commands": ["ctrl+p", "f2"],
     "composer.submit": ["ctrl+enter"],
     "composer.newline": ["enter", "shift+enter", "alt+enter"],
     "app.theme": ["alt+t"],
@@ -245,6 +264,7 @@ Application actions are active with the composer, except where noted:
 | Action | Default | Behavior |
 | --- | --- | --- |
 | `app.commands` | `ctrl+p` | Open command palette |
+| `app.help` | `f1` | Open/close keyboard shortcuts; active everywhere |
 | `app.new` | `ctrl+n` | New session |
 | `app.sessions` | `ctrl+s` | Switch session |
 | `app.agents` | `ctrl+a` | Switch agent |
@@ -252,11 +272,11 @@ Application actions are active with the composer, except where noted:
 | `app.cycle-mode` | `shift+tab` | Cycle advertised agent modes |
 | `app.files` | `ctrl+f` | Attach file |
 | `app.sidebar` | `ctrl+b` | Toggle sidebar |
-| `app.tools` | `ctrl+o` | Toggle tool details; active everywhere |
+| `app.tools` | `ctrl+o` | Toggle tool details; suspended in help |
 | `app.quit` | `ctrl+q` | Quit; active everywhere |
 | `app.interrupt` | `ctrl+c` | Cancel while busy, otherwise quit; active everywhere |
-| `app.cancel` | `escape` | Close picker, cancel interaction/turn, or clear notice/error |
-| `app.scrollUp` / `app.scrollDown` | `pageup` / `pagedown` | Scroll transcript; also active in pickers/permissions, suspended in forms |
+| `app.cancel` | `escape` | Close help/picker, cancel interaction/turn, or clear notice/error |
+| `app.scrollUp` / `app.scrollDown` | `pageup` / `pagedown` | Scroll transcript; also active in pickers/permissions, suspended in forms/help |
 | `app.clear-attachments` | Unbound | Clear attachments |
 | `app.reconnect` | Unbound | Reconnect current session |
 | `app.thoughts` | Unbound | Toggle reasoning visibility |
@@ -266,7 +286,7 @@ Application actions are active with the composer, except where noted:
 | `app.paths` | Unbound | Show configuration/data paths |
 | `app.usage` | Unbound | Show last reported session cost/context |
 
-Composer, picker, and interaction actions are active only in their corresponding UI:
+Composer, picker, help, and interaction actions are active only in their corresponding UI:
 
 | Action | Default | Behavior |
 | --- | --- | --- |
@@ -276,6 +296,8 @@ Composer, picker, and interaction actions are active only in their corresponding
 | `composer.historyPrevious` / `composer.historyNext` | `ctrl+up` / `ctrl+down` | Browse prompt history |
 | `picker.previous` / `picker.next` | `up` / `down` | Highlight choice |
 | `picker.confirm` | `enter` | Select choice |
+| `help.previous` / `help.next` | `up` / `down` | Scroll shortcut reference |
+| `help.pageUp` / `help.pageDown` | `pageup` / `pagedown` | Page shortcut reference |
 | `permission.previous` / `permission.next` | `up` / `down` | Highlight permission/URL-request option |
 | `permission.confirm` | `enter` | Confirm highlighted agent option |
 | `form.decline` | `ctrl+d` | Decline form, including JSON mode |

@@ -6,11 +6,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 test("keybindings inherit defaults, replace alternatives and disable shortcuts", () => {
-  const keys = resolveKeybindings({ "app.commands": ["alt+p", "f1"], "app.sidebar": [] });
-  expect(keys.label("app.commands")).toBe("Alt+P / F1");
+  const keys = resolveKeybindings({ "app.commands": ["alt+p", "f2"], "app.sidebar": [] });
+  expect(keys.label("app.commands")).toBe("Alt+P / F2");
   expect(keys.hint("app.commands", "commands")).toBe("Alt+P commands");
   expect(keys.matches("app.commands", { name: "p", ctrl: true })).toBe(false);
-  expect(keys.matches("app.commands", { name: "f1" })).toBe(true);
+  expect(keys.matches("app.commands", { name: "f2" })).toBe(true);
   expect(keys.label("app.sidebar")).toBe("");
   expect(keys.hint("app.sidebar", "sidebar")).toBe("sidebar (unbound)");
   expect(keys.label("composer.submit")).toBe("Enter");
@@ -36,7 +36,7 @@ test("configuration rejects malformed keys, unknown actions and overlapping cont
   }
   expect(() => configSchema.parse({ keybindings: { "app.command": ["f1"] } })).toThrow("Unknown keybinding action");
   expect(() => configSchema.parse({ keybindings: { "app.commands": "f1" } })).toThrow();
-  expect(() => resolveKeybindings({ "app.commands": ["f1", "F1"] })).toThrow("duplicate");
+  expect(() => resolveKeybindings({ "app.commands": ["f2", "F2"] })).toThrow("duplicate");
   expect(() => resolveKeybindings({ "app.commands": ["ctrl+s"] })).toThrow("app.sessions");
   expect(() => resolveKeybindings({ "app.quit": ["enter"] })).toThrow("composer.submit");
   expect(() => resolveKeybindings({ "form.confirm": ["ctrl+e"] })).toThrow("form.toggleJson");

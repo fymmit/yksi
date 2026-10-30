@@ -8,13 +8,15 @@ import { changedFiles } from "../state";
 import { sessionMode } from "../modes";
 import { projectFiles } from "../files";
 import { appPaths } from "../config";
-import { resolveKeybindings, type KeyAction } from "../keybindings";
+import { resolveKeybindings, type KeyAction, type KeyContext } from "../keybindings";
 import { consumeKey, suppressEditorFallback } from "./keybindings";
 import { syntaxStyle, themes, type ThemeName } from "./theme";
 import { Picker, type Choice } from "./picker";
 import { InteractionView } from "./interaction";
 import { TimelineEntry } from "./timeline";
 import { formatCost, usageSummary } from "./usage";
+import { StatusBar } from "./status-bar";
+import { KeyboardHelp } from "./help";
 
 export function App(props: { controller: Controller; quit: () => void; autoConnect?: boolean }) {
   const controller = props.controller;
@@ -34,6 +36,9 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const [draft, setDraft] = createSignal("");
   const [attachments, setAttachments] = createSignal<string[]>([]);
   const [palette, setPalette] = createSignal<{ title: string; choices: Choice[] }>();
+  const [help, setHelp] = createSignal<KeyContext>();
+  const [formContext, setFormContext] = createSignal<KeyContext>("form.text");
+  const showHelp = () => setHelp(state.interaction ? state.interaction.form ? formContext() : "permission" : palette() ? "picker" : "composer");
   const [notice, setNotice] = createSignal("");
   let editor: TextareaRenderable | undefined;
   let scroll: ScrollBoxRenderable | undefined;
@@ -86,6 +91,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const toggleSidebar = () => { setSidebar(value => !value); controller.storage.setSetting("sidebar", sidebar()); };
   const toggleTheme = () => { setThemeName(name => name === "dark" ? "light" : "dark"); controller.storage.setSetting("theme", themeName()); };
   const clientCommands = (): Choice[] => [
+    { id: "help", label: "Keyboard shortcuts", run: showHelp },
     { id: "new", label: "New session", run: () => controller.open() },
     { id: "sessions", label: "Switch session", run: showSessions },
     { id: "agents", label: "Switch agent", run: showAgents },
@@ -138,6 +144,8 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       if (keys.matches("app.interrupt", key) && busy()) run(() => controller.cancel()); else props.quit();
       return;
     }
+    if (keys.matches("app.help", key)) { if (consumeKey(key)) { if (help()) setHelp(undefined); else showHelp(); } return; }
+    if (help()) return;
     if (keys.matches("app.tools", key)) { if (consumeKey(key)) setExpanded(value => !value); return; }
     if (!state.interaction?.form && (keys.matches("app.scrollUp", key) || keys.matches("app.scrollDown", key))) {
       if (consumeKey(key, true)) scroll?.scrollBy(keys.matches("app.scrollUp", key) ? -10 : 10);
@@ -212,21 +220,19 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           <For each={state.session.plan}>{entry => <text fg={entry.status === "completed" ? theme().muted : theme().text}>{entry.status === "completed" ? "✓" : entry.status === "in_progress" ? "›" : "○"} {entry.content}</text>}</For>
           <Show when={changedFiles(state.session).length}><text fg={theme().accent} marginTop={1}>Reported diffs</text></Show>
           <For each={changedFiles(state.session)}>{path => <text fg={theme().muted}>{relative(state.session.cwd, path)}</text>}</For>
-          <text fg={theme().muted} marginTop={2}>{hint("app.sessions", "sessions")}{"\n"}{hint("app.new", "new session")}{"\n"}{hint("app.config", "model / mode")}{"\n"}{hint("app.sidebar", "hide sidebar")}</text>
         </scrollbox>
       </Show>
     </box>
     <Show when={state.error || notice()}><text fg={state.error ? theme().error : theme().muted} paddingX={1} maxHeight={3} flexShrink={0}>{state.error ?? notice()}</text></Show>
-    <Show when={palette()} keyed>{menu => <Picker title={menu.title} choices={menu.choices} theme={theme()} keys={keys} height={dimensions().height} close={() => setPalette(undefined)} error={error => controller.report(error)} />}</Show>
-    <Show when={state.interaction} keyed>{interaction => <InteractionView interaction={interaction} theme={theme()} keys={keys} answer={(id, content) => controller.answer(id, content)} />}</Show>
+    <Show when={palette()} keyed>{menu => <Picker title={menu.title} choices={menu.choices} theme={theme()} keys={keys} active={!help()} height={dimensions().height} close={() => setPalette(undefined)} error={error => controller.report(error)} />}</Show>
+    <Show when={state.interaction} keyed>{interaction => <InteractionView interaction={interaction} theme={theme()} keys={keys} active={!help()} onContext={setFormContext} answer={(id, content) => controller.answer(id, content)} />}</Show>
     <box border borderColor={busy() ? theme().accent : theme().border} backgroundColor={theme().panel} flexDirection="column" paddingX={1} flexShrink={0}>
       <Show when={mode()}>{current => <text fg={theme().accent} maxHeight={1}>{current().name}: {current().options.find(option => option.value === current().currentValue)?.name ?? String(current().currentValue)}{current().options.length > 1 ? ` · ${hint("app.cycle-mode", "cycle mode")}` : ""}</text>}</Show>
       <Show when={attachments().length}><text fg={theme().accent} maxHeight={2}>Attached: {attachments().join(", ")}</text></Show>
-      <textarea ref={editor} focused={!palette() && !state.interaction} height={Math.min(5, Math.max(2, draft().split("\n").length))} placeholder={busy() ? "Compose your next message…" : `Ask anything · / commands · @ then ${hint("composer.complete", "to attach a file")}`} textColor={theme().text} focusedTextColor={theme().text} backgroundColor={theme().panel} focusedBackgroundColor={theme().panel} cursorColor={theme().accent} onContentChange={() => setDraft(editor?.plainText ?? "")} />
+      <textarea ref={editor} focused={!help() && !palette() && !state.interaction} height={Math.min(5, Math.max(2, draft().split("\n").length))} placeholder={busy() ? "Compose your next message…" : `Ask anything · / commands · @ then ${hint("composer.complete", "to attach a file")}`} textColor={theme().text} focusedTextColor={theme().text} backgroundColor={theme().panel} focusedBackgroundColor={theme().panel} cursorColor={theme().accent} onContentChange={() => setDraft(editor?.plainText ?? "")} />
       <Show when={completions().length}><text fg={theme().muted} maxHeight={1}>{completions().join("  ")} · {hint("composer.complete", "complete")}</text></Show>
     </box>
-    <text height={1} flexShrink={0} paddingX={1} fg={theme().muted}>{(dimensions().width < 80
-      ? [hint("composer.submit", "send"), hint("app.commands", "commands"), hint("app.cancel", "cancel")]
-      : [hint("composer.submit", "send"), hint("composer.newline", "newline"), hint("app.commands", "commands"), hint("app.tools", "tools"), hint("app.scrollUp", "up"), hint("app.scrollDown", "down"), hint("app.quit", "quit")]).join(" · ")}</text>
+    <StatusBar session={state.session} width={dimensions().width} theme={theme()} keys={keys} help={() => help() ? setHelp(undefined) : showHelp()} />
+    <Show when={help()}>{context => <KeyboardHelp context={context()} keys={keys} theme={theme()} width={dimensions().width} height={dimensions().height} close={() => setHelp(undefined)} />}</Show>
   </box>;
 }

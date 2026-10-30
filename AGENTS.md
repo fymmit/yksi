@@ -46,6 +46,9 @@ from other directories. Bundles require the preload too (see README).
 - `src/state.ts`: serializable conversation model and update reducer.
 - `src/storage.ts`: SQLite persistence, workspace-scoped local history.
 - `src/ui/`: Solid components, palette, composer, tool/diff rendering and themes.
+  `status-bar.tsx` renders a single-line, width-aware session summary with a
+  reserved help hint. `help.tsx` renders searchable floating keyboard help from
+  the keybinding registry's descriptions and resolved alternatives.
   `usage.ts` formats reported session cost and the local `/tui:usage` summary.
   `form.tsx` and `form-state.ts` render and validate keyboard-driven elicitation
   forms, with checkbox multi-selects for finite-choice string arrays and JSON
@@ -101,6 +104,9 @@ from other directories. Bundles require the preload too (see README).
   keys before other handlers/widgets; suppress managed OpenTUI editor defaults
   with `src/ui/keybindings.ts` so disabled/remapped keys cannot fall through.
   Confirmation/submission/toggle actions ignore repeat events; navigation repeats.
+  Help is a separate keyboard context. While open, keep underlying pickers/forms
+  mounted but inactive so drafts, selection, and cursor position survive. Only
+  help controls and global quit/interrupt handlers act; Escape closes help alone.
 - Keep dependencies pinned via `bun.lock`; do not edit vendored dependencies.
 - Changes to protocol/state/lifecycle need meaningful tests. For UI behavior use
   `testRender`, real key events, and frame assertions; always dispose renderers.
@@ -114,6 +120,15 @@ Implemented: stdio agents, streaming Markdown, tool cards/diffs, client file and
 terminal services, permissions, form/URL elicitation, cancellation, local session
 history and advertised resumption, file attachments, dynamic agent commands and
 configuration, configurable keybindings, themes, sidebar, export and offline demo.
+The footer summarizes session identity/settings, context/cost, completed/total
+plan steps, and reported-diff file count. Lower-priority fields are omitted at
+narrow widths; a configurable help hint remains at the right. The sidebar remains
+visible by default at 100+ columns, respecting the saved preference. F1 (`app.help`),
+**Keyboard shortcuts**, and `/tui:help` open a searchable floating reference with
+current-context shortcuts first, all configured alternatives, and unbound actions.
+F1/Escape closes it with focus and drafts restored. Help scrolling uses
+`help.previous`/`help.next` and `help.pageUp`/`help.pageDown`. General footer/sidebar
+shortcut lists are replaced by help; contextual interaction hints remain.
 Standard ACP context and cumulative session cost appear in the sidebar when
 reported; **Show session usage** / `/tui:usage` shows a snapshot with local receipt
 time, including on narrow terminals. `app.usage` is unbound by default.

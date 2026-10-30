@@ -1,13 +1,13 @@
-import { createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import type { ElicitationSchema } from "@agentclientprotocol/sdk";
 import { createForm, numberValue, questionChoices, questionState, sameAnswer, type FormContent, type FormErrors, type QuestionState } from "./form-state";
 import type { Theme } from "./theme";
-import { defaultKeybindings, type Keybindings } from "../keybindings";
+import { defaultKeybindings, type Keybindings, type KeyContext } from "../keybindings";
 import { consumeKey, suppressEditorFallback } from "./keybindings";
 
-export function FormView(props: { schema: ElicitationSchema; theme: Theme; keys?: Keybindings; answer: (id?: string, content?: FormContent) => void }) {
+export function FormView(props: { schema: ElicitationSchema; theme: Theme; keys?: Keybindings; active?: boolean; onContext?: (context: KeyContext) => void; answer: (id?: string, content?: FormContent) => void }) {
   const keys = props.keys ?? defaultKeybindings;
   const hint = keys.hint;
   const form = createForm(props.schema);
@@ -21,6 +21,10 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; keys?
   let activeEditor: { index: number; editor: TextareaRenderable } | undefined;
   let optionsScroll: ScrollBoxRenderable | undefined;
   let submitted = false;
+  createEffect(() => {
+    const field = form.fields[index()];
+    props.onContext?.(json() ? "form.json" : field && questionChoices(field).length ? "form.choice" : "form.text");
+  });
   const update = (position: number, patch: Partial<QuestionState>) =>
     setQuestions(previous => previous.map((question, i) => i === position ? { ...question, ...patch } : question));
   const saveEditor = () => {
@@ -148,7 +152,7 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; keys?
     setJson(value => !value);
   };
   useKeyboard(key => {
-    if (key.defaultPrevented) return;
+    if (key.defaultPrevented || props.active === false) return;
     if (submitted) { consumeKey(key); return; }
     if (keys.matches("form.toggleJson", key)) { if (consumeKey(key)) toggleMode(); return; }
     if (json()) {
@@ -214,7 +218,7 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; keys?
           <text fg={props.theme.accent} flexShrink={0}>{field.title}{field.required ? " *" : " (optional)"}</text>
           <Show when={field.description}><text fg={props.theme.muted}>{field.description}</text></Show>
           <Show when={choices.length} fallback={
-            <textarea ref={value => { editor = value; activeEditor = { index: position, editor: value }; }} focused height={field.type === "string" ? 3 : 1}
+            <textarea ref={value => { editor = value; activeEditor = { index: position, editor: value }; }} focused={props.active !== false} height={field.type === "string" ? 3 : 1}
               initialValue={untrack(() => question().text ?? "")} placeholder={field.type === "string" ? "Enter text" : "Enter a number"}
               textColor={props.theme.text} backgroundColor={props.theme.bg} focusedBackgroundColor={props.theme.bg}
               onContentChange={() => {
@@ -228,7 +232,7 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; keys?
               <For each={choices}>{(choice, i) => <text id={`question-option-${position}-${i()}`}
                 fg={question().highlight === i() ? props.theme.accent : props.theme.text}
                 onMouseDown={() => {
-                  if (submitted) return;
+                  if (submitted || props.active === false) return;
                   update(position, { highlight: i() });
                   if (field.type === "array" && choice.value !== undefined) toggleSelection(i());
                   else confirm();
@@ -254,7 +258,7 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; keys?
       <scrollbox maxHeight={3} scrollY>
         <For each={Object.entries(props.schema.properties ?? {})}>{([name, schema]) => <text fg={props.theme.muted}>{name}: {JSON.stringify(schema)}</text>}</For>
       </scrollbox>
-      <textarea ref={jsonEditor} focused flexGrow={1} minHeight={2} maxHeight={6} initialValue={jsonText} textColor={props.theme.text} backgroundColor={props.theme.bg} focusedBackgroundColor={props.theme.bg} />
+      <textarea ref={jsonEditor} focused={props.active !== false} flexGrow={1} minHeight={2} maxHeight={6} initialValue={jsonText} textColor={props.theme.text} backgroundColor={props.theme.bg} focusedBackgroundColor={props.theme.bg} />
       <For each={Object.entries(errors().fields)}>{([name, error]) => <text fg={props.theme.error}>{name}: {error}</text>}</For>
       <text fg={props.theme.muted} flexShrink={0}>{hint("form.toggleJson", "questions")} · {hint("form.submitJson", "submit")} · {hint("form.jsonNewline", "newline")}</text>
     </Show>
