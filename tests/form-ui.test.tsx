@@ -13,7 +13,7 @@ async function renderForm(schema: ElicitationSchema, width = 100, height = 35) {
   </box>, { width, height, kittyKeyboard: true });
   await setup.renderOnce();
   const key = async (name: string, modifiers: { ctrl?: boolean; shift?: boolean; meta?: boolean } = {}) => {
-    const keys: Record<string, string> = { return: "RETURN", escape: "ESCAPE", down: "ARROW_DOWN", up: "ARROW_UP", left: "ARROW_LEFT", right: "ARROW_RIGHT" };
+    const keys: Record<string, string> = { return: "RETURN", escape: "ESCAPE", down: "ARROW_DOWN", up: "ARROW_UP", left: "ARROW_LEFT", right: "ARROW_RIGHT", space: " " };
     setup.mockInput.pressKey(keys[name] ?? name, modifiers);
     await setup.renderOnce();
   };
@@ -221,13 +221,157 @@ test("changed JSON values reset only the affected confirmations", async () => {
 });
 
 test("array schemas keep explicit JSON submission and block unsupported question mode", async () => {
-  const setup = await renderForm({ properties: { tags: { type: "array", items: { type: "string", enum: ["one", "two"] }, default: ["one"] } } });
+  const setup = await renderForm({ properties: { tags: { type: "array", items: { type: "string" }, default: ["one"] } } });
   try {
     expect(setup.captureCharFrame()).toContain("JSON required for: tags");
     await setup.key("e", { ctrl: true });
     expect(setup.captureCharFrame()).toContain("JSON is required for: tags");
     await setup.key("return", { ctrl: true });
     expect(setup.answers).toEqual([{ id: "accept", content: { tags: ["one"] } }]);
+  } finally { await setup.dispose(); }
+});
+
+test("multi-select toggles exact values without advancing and retains drafts across questions", async () => {
+  const setup = await renderForm({ properties: {
+    tags: { type: "array", items: { anyOf: [{ const: "a", title: "Alpha" }, { const: "b", title: "Beta" }] }, default: ["b"] },
+    done: { type: "boolean" },
+  }, required: ["tags", "done"] });
+  try {
+    expect(setup.captureCharFrame()).toContain("[x] Beta");
+    expect(setup.captureCharFrame()).toContain("0 answered");
+    await setup.key("space");
+    expect(setup.captureCharFrame()).toContain("[x] Alpha");
+    expect(setup.captureCharFrame()).toContain("2 selected");
+    await setup.key("\x1b[32;1:2u");
+    expect(setup.captureCharFrame()).toContain("2 selected");
+    await setup.key("right");
+    await setup.key("left");
+    expect(setup.captureCharFrame()).toContain("[x] Alpha");
+    expect(setup.answers).toEqual([]);
+    await setup.key("return");
+    await setup.key("left");
+    await setup.key("space");
+    expect(setup.captureCharFrame()).toContain("0 answered");
+    await setup.key("right");
+    await setup.key("return");
+    expect(setup.answers).toEqual([]);
+    expect(setup.captureCharFrame()).toContain("Question 1/2");
+    await setup.key("return");
+    await setup.key("return");
+    expect(setup.answers).toEqual([{ id: "accept", content: { tags: ["b"], done: true } }]);
+  } finally { await setup.dispose(); }
+});
+
+test("multi-select validates cardinality and distinguishes empty answers from skipping", async () => {
+  const setup = await renderForm({ properties: {
+    tags: { type: "array", items: { type: "string", enum: ["a", "b"] }, minItems: 1, maxItems: 1 },
+    empty: { type: "array", items: { type: "string", enum: ["a"] } },
+    optionalEmpty: { type: "array", items: { type: "string", enum: ["a"] } },
+    skipped: { type: "array", items: { type: "string", enum: ["a"] }, default: ["a"] },
+    shortcut: { type: "array", items: { type: "string", enum: ["a"] }, default: ["a"] },
+  }, required: ["tags", "empty"] });
+  try {
+    await setup.key("return");
+    expect(setup.captureCharFrame()).toContain("fewer than 1");
+    await setup.key("space");
+    await setup.key("down");
+    await setup.key("space");
+    await setup.key("return");
+    expect(setup.captureCharFrame()).toContain("more than 1");
+    await setup.key("u", { ctrl: true });
+    expect(setup.captureCharFrame()).toContain("0 selected");
+    await setup.key("space");
+    await setup.key("return");
+    await setup.key("return");
+    await setup.key("return");
+    await setup.key("down");
+    expect(setup.captureCharFrame()).toContain("> Skip (leave unset)");
+    await setup.key("return");
+    await setup.key("u", { ctrl: true });
+    expect(setup.answers).toEqual([{ id: "accept", content: { tags: ["a"], empty: [], optionalEmpty: [] } }]);
+  } finally { await setup.dispose(); }
+});
+
+test("array JSON round trips retain confirmations and changed values require reconfirmation", async () => {
+  const setup = await renderForm({ properties: {
+    tags: { type: "array", items: { type: "string", enum: ["a", "b"] }, default: ["b", "a"] },
+    done: { type: "boolean", default: true },
+  } });
+  try {
+    await setup.key("return");
+    await setup.key("e", { ctrl: true });
+    await setup.key("e", { ctrl: true });
+    expect(setup.captureCharFrame()).toContain("1 answered");
+    expect(setup.answers).toEqual([]);
+    await setup.key("e", { ctrl: true });
+    await setup.key("HOME");
+    await setup.key("END", { shift: true });
+    await setup.mockInput.typeText('{"tags":["a"],"done":true}');
+    await setup.key("e", { ctrl: true });
+    expect(setup.captureCharFrame()).toContain("0 answered");
+    await setup.key("return");
+    expect(setup.answers).toEqual([]);
+    expect(setup.captureCharFrame()).toContain("[x] a");
+    expect(setup.captureCharFrame()).toContain("[ ] b");
+    await setup.key("return");
+    expect(setup.answers).toEqual([{ id: "accept", content: { tags: ["a"], done: true } }]);
+  } finally { await setup.dispose(); }
+});
+
+test("duplicate array defaults remain in JSON without silently dropping entries", async () => {
+  const setup = await renderForm({ properties: {
+    tags: { type: "array", items: { type: "string", enum: ["a", "b"] }, default: ["a", "a"] },
+  } });
+  try {
+    expect(setup.captureCharFrame()).toContain("cannot be represented");
+    await setup.key("e", { ctrl: true });
+    expect(setup.captureCharFrame()).toContain("JSON is required");
+    await setup.key("return", { ctrl: true });
+    expect(setup.answers).toEqual([{ id: "accept", content: { tags: ["a", "a"] } }]);
+  } finally { await setup.dispose(); }
+});
+
+test("duplicate JSON selections cannot enter question mode and can be repaired", async () => {
+  const setup = await renderForm({ properties: {
+    tags: { type: "array", items: { type: "string", enum: ["a", "b"] } },
+  } });
+  try {
+    await setup.key("space");
+    await setup.key("e", { ctrl: true });
+    await setup.key("HOME");
+    await setup.key("END", { shift: true });
+    await setup.mockInput.typeText('{"tags":["b","b"]}');
+    await setup.key("e", { ctrl: true });
+    expect(setup.captureCharFrame()).toContain("cannot be represented");
+    expect(setup.answers).toEqual([]);
+    await setup.key("HOME");
+    await setup.key("END", { shift: true });
+    await setup.mockInput.typeText('{"tags":["b"]}');
+    await setup.key("e", { ctrl: true });
+    expect(setup.captureCharFrame()).toContain("[x] b");
+    expect(setup.captureCharFrame()).toContain("0 answered");
+    await setup.key("return");
+    expect(setup.answers).toEqual([{ id: "accept", content: { tags: ["b"] } }]);
+  } finally { await setup.dispose(); }
+});
+
+test("long multi-select lists scroll and mouse toggles do not confirm", async () => {
+  const setup = await renderForm({ properties: {
+    tags: { type: "array", items: { type: "string", enum: Array.from({ length: 20 }, (_, i) => `Option ${i}`) } },
+  } }, 60, 24);
+  try {
+    for (let i = 0; i < 19; i++) await setup.key("down");
+    expect(setup.captureCharFrame()).toContain("> [ ] Option 19");
+    expect(setup.captureCharFrame()).toContain("Space toggle");
+    const rows = setup.captureCharFrame().split("\n");
+    const y = rows.findIndex(row => row.includes("Option 19"));
+    const x = rows[y]!.indexOf("Option 19");
+    await setup.mockMouse.click(x, y);
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("> [x] Option 19");
+    expect(setup.answers).toEqual([]);
+    await setup.key("return");
+    expect(setup.answers).toEqual([{ id: "accept", content: { tags: ["Option 19"] } }]);
   } finally { await setup.dispose(); }
 });
 

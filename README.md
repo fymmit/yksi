@@ -103,6 +103,12 @@ Left/Right revisits questions without losing drafts or changing confirmed
 choices. Defaults still need confirmation. Once every question is answered or
 explicitly skipped, the validated form is submitted automatically.
 
+Multi-select questions show checkboxes: Up/Down highlights an option, Space toggles
+it, and Enter confirms the selection. Clicking a checkbox toggles it without
+confirming. Defaults and changed selections need confirmation. Ctrl+U skips an
+optional selection or clears a required one. **Skip** omits the property; confirming
+an empty selection sends `[]` when the schema allows it.
+
 For text and numbers, type an answer and press Enter. Shift+Enter / Alt+Enter
 inserts a text newline; Ctrl+B / Ctrl+F moves the cursor, since Left/Right switches
 questions (Home/End also work). Optional choices include **Skip**; Ctrl+U skips an
@@ -112,9 +118,11 @@ questions are marked `*`; invalid answers stay open with an error.
 
 Ctrl+D declines and Escape cancels. Ctrl+E switches to advanced JSON editing,
 where Ctrl+Enter explicitly validates and submits. Returning to questions
-requires valid JSON and does not submit or confirm changed answers. Arrays and
-unsupported widget types use JSON automatically, with schema validation still
-required. Try `/question` in the offline demo. URL requests display a selectable
+requires valid JSON and does not submit or confirm changed answers. String arrays
+with finite choices use multi-select controls; other arrays and unsupported widget
+types use JSON automatically. Selections that checkboxes cannot represent, such as
+duplicate array entries, remain in JSON without losing values. Schema validation
+is always required. Try `/question` in the offline demo. URL requests display a selectable
 link to open in your browser.
 
 ## Agent configuration

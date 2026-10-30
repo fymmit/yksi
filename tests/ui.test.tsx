@@ -98,12 +98,16 @@ test("offline demo form accepts keyboard answers without consuming the composer 
     setup.mockInput.pressArrow("down");
     setup.mockInput.pressEnter();
     setup.mockInput.pressEnter();
+    setup.mockInput.pressKey(" ");
+    setup.mockInput.pressArrow("down");
+    setup.mockInput.pressKey(" ");
+    setup.mockInput.pressEnter();
     setup.mockInput.pressKey("u", { ctrl: true });
     await turn;
     await setup.renderOnce();
     const last = controller.session.items.at(-1);
     expect(last?.type === "message" && JSON.parse(last.text.replace("Your answer: ", ""))).toEqual({
-      action: "accept", content: { name: "keyboard-project", tests: false, template: "web", workers: 1 },
+      action: "accept", content: { name: "keyboard-project", tests: false, template: "web", workers: 1, extras: ["docs", "ci"] },
     });
     expect(setup.captureCharFrame()).toContain("Keep my draft");
     expect(controller.snapshot().interaction).toBeUndefined();

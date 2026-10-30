@@ -39,6 +39,7 @@ const app = acp.agent({ name: "acp-tui-demo" })
           tests: { type: "boolean", title: "Include tests", default: true },
           template: { type: "string", title: "Template", oneOf: [{ const: "cli", title: "Command-line app" }, { const: "web", title: "Web app" }], default: "cli" },
           workers: { type: "integer", title: "Workers", minimum: 1, maximum: 8, default: 1 },
+          extras: { type: "array", title: "Project extras", items: { anyOf: [{ const: "docs", title: "Documentation" }, { const: "ci", title: "Continuous integration" }] }, maxItems: 2 },
           notes: { type: "string", title: "Notes", description: "Optional instructions for this demo project." },
         },
         required: ["name"],

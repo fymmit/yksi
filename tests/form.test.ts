@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createForm, numberValue, questionChoices, questionState } from "../src/ui/form-state";
+import { createForm, numberValue, questionChoices, questionState, sameAnswer } from "../src/ui/form-state";
 
 test("form model honors nullable constraints, defaults, types and optional omission", () => {
   const form = createForm({ required: ["name"], properties: {
@@ -18,7 +18,7 @@ test("form model honors nullable constraints, defaults, types and optional omiss
   expect(form.validate({ name: "Hi", other: true }).errors?.summary).toContain("additional properties");
 });
 
-test("enum controls use exact values and array fields fall back to validated JSON", () => {
+test("enum and multi-select controls use exact values with schema validation", () => {
   const form = createForm({ properties: {
     mode: { type: "string", oneOf: [{ const: "fast", title: "Quick" }, { const: "full", title: "Thorough" }] },
     color: { type: "string", enum: ["red", "blue"] },
@@ -26,9 +26,44 @@ test("enum controls use exact values and array fields fall back to validated JSO
   } });
   expect(form.fields[0]?.choices).toEqual([{ value: "fast", title: "Quick" }, { value: "full", title: "Thorough" }]);
   expect(form.fields[1]?.choices?.[0]).toEqual({ value: "red", title: "red" });
-  expect(form.fallback).toEqual(["tags"]);
+  expect(form.fallback).toEqual([]);
+  expect(form.fields[2]?.choices).toEqual([{ value: "a", title: "a" }, { value: "b", title: "b" }]);
   expect(form.validate({ mode: "full", tags: ["a"] }).content).toEqual({ mode: "full", tags: ["a"] });
   expect(form.validate({ mode: "Thorough", tags: [] }).errors?.fields).toHaveProperty("tags");
+});
+
+test("multi-selects support titled choices, defaults, omission and cardinality", () => {
+  const form = createForm({ properties: {
+    tags: { type: "array", items: { anyOf: [{ const: "a", title: "Alpha" }, { const: "b", title: "Beta" }] }, default: ["b"], minItems: 1, maxItems: 1 },
+    required: { type: "array", items: { type: "string", enum: ["a"] } },
+  }, required: ["required"] });
+  const field = form.fields[0]!;
+  expect(form.schemaError).toBe("");
+  expect(field.choices).toEqual([{ value: "a", title: "Alpha" }, { value: "b", title: "Beta" }]);
+  expect(questionState(field, form.defaults.tags)).toEqual({ text: undefined, value: ["b"], highlight: 0, confirmed: false });
+  expect(form.validateField(field, undefined)).toBeUndefined();
+  expect(form.validateField(field, [])?.fields.tags).toContain("fewer than 1");
+  expect(form.validateField(field, ["a", "b"])?.fields.tags).toContain("more than 1");
+  expect(form.validateField(field, ["Alpha"])?.fields.tags).toBeDefined();
+  expect(form.validate({ required: [] }).content).toEqual({ required: [] });
+  expect(form.validate({}).errors?.fields.required).toContain("required");
+  expect(form.questionFallback({ tags: ["b"] })).toEqual([]);
+  expect(form.questionFallback({ tags: ["b", "b"] })[0]).toContain("cannot be represented");
+  expect(form.questionFallback({ tags: ["unknown"] })[0]).toContain("cannot be represented");
+  expect(form.questionFallback({ tags: "b" })[0]).toContain("cannot be represented");
+});
+
+test("unsupported arrays retain JSON fallback and array equality preserves order", () => {
+  const form = createForm({ properties: {
+    free: { type: "array", items: { type: "string" } },
+    custom: { type: "array", items: { type: "_custom" } },
+    duplicate: { type: "array", items: { type: "string", enum: ["a", "a"] } },
+  } });
+  expect(form.fallback).toEqual(["free", "custom", "duplicate"]);
+  expect(sameAnswer(["b", "a"], ["b", "a"])).toBe(true);
+  expect(sameAnswer(["b", "a"], ["a", "b"])).toBe(false);
+  expect(sameAnswer([], undefined)).toBe(false);
+  expect(sameAnswer(["a"], ["a", "a"])).toBe(false);
 });
 
 test("invalid schemas and unsupported content produce explicit errors", () => {

@@ -2,12 +2,13 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import type { ElicitationSchema } from "@agentclientprotocol/sdk";
-import { createForm, numberValue, questionChoices, questionState, type FormContent, type FormErrors, type QuestionState } from "./form-state";
+import { createForm, numberValue, questionChoices, questionState, sameAnswer, type FormContent, type FormErrors, type QuestionState } from "./form-state";
 import type { Theme } from "./theme";
 
 export function FormView(props: { schema: ElicitationSchema; theme: Theme; answer: (id?: string, content?: FormContent) => void }) {
   const form = createForm(props.schema);
-  const [json, setJson] = createSignal(form.fallback.length > 0);
+  const [fallback, setFallback] = createSignal(form.questionFallback(form.defaults));
+  const [json, setJson] = createSignal(fallback().length > 0);
   const [questions, setQuestions] = createSignal(form.fields.map(field => questionState(field, Object.hasOwn(form.defaults, field.name) ? form.defaults[field.name] : undefined)));
   const [index, setIndex] = createSignal(0);
   const [errors, setErrors] = createSignal<FormErrors>({ fields: {}, summary: "" });
@@ -66,7 +67,9 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
     const choices = questionChoices(field);
     let value: FormContent[string] | undefined;
     if (!skip) {
-      if (choices.length) value = choices[question.highlight]?.value;
+      if (field.type === "array") {
+        value = choices[question.highlight]?.value === undefined && !field.required ? undefined : question.value ?? [];
+      } else if (choices.length) value = choices[question.highlight]?.value;
       else if (field.type === "number" || field.type === "integer") {
         value = numberValue(question.text ?? "");
         if (value === undefined) { showErrors({ fields: { [field.name]: "Enter a finite number." }, summary: "" }); return; }
@@ -78,6 +81,18 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
       text: choices.length || value === undefined ? undefined : String(value) });
     setErrors({ fields: {}, summary: "" });
     advance();
+  };
+  const toggleSelection = (highlight: number) => {
+    if (submitted) return;
+    const field = form.fields[index()];
+    if (field?.type !== "array") return;
+    const choice = questionChoices(field)[highlight];
+    if (typeof choice?.value !== "string") return;
+    const value = choice.value;
+    const selected = questions()[index()]!.value;
+    const values = Array.isArray(selected) ? selected : [];
+    update(index(), { highlight, value: values.includes(value) ? values.filter(item => item !== value) : [...values, value], confirmed: false });
+    setErrors({ fields: {}, summary: "" });
   };
   const draftContent = (): FormContent | undefined => {
     saveEditor();
@@ -107,13 +122,16 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
       try {
         const result = form.validate(readJson());
         if (result.errors) { showErrors(result.errors); return; }
+        const unsupported = form.questionFallback(result.content);
+        setFallback(unsupported);
+        if (unsupported.length) { showErrors({ fields: {}, summary: `JSON is required for: ${unsupported.join(", ")}.` }); return; }
         setQuestions(previous => previous.map((question, i) => {
           const field = form.fields[i]!;
           const value = Object.hasOwn(result.content, field.name) ? result.content[field.name] : undefined;
           const original = questionChoices(field).length ? question.value
             : question.text === undefined ? undefined
               : field.type === "number" || field.type === "integer" ? numberValue(question.text) : question.text;
-          return value === original ? question : questionState(field, value);
+          return sameAnswer(value, original) ? question : questionState(field, value);
         }));
       } catch (error) { showErrors({ fields: {}, summary: error instanceof Error ? error.message : String(error) }); return; }
     } else {
@@ -157,6 +175,11 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
       return;
     }
     const choices = questionChoices(field);
+    if (field.type === "array" && key.name === "space" && !key.ctrl && !key.meta && !key.shift) {
+      key.preventDefault(); key.stopPropagation();
+      if (!key.repeated && key.eventType !== "repeat") toggleSelection(questions()[index()]!.highlight);
+      return;
+    }
     if (choices.length && (key.name === "up" || key.name === "down")) {
       key.preventDefault();
       const highlight = Math.max(0, Math.min(choices.length - 1, questions()[index()]!.highlight + (key.name === "up" ? -1 : 1)));
@@ -174,6 +197,10 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
         const position = form.fields.indexOf(field);
         const question = () => questions()[position]!;
         const choices = questionChoices(field);
+        const selected = () => {
+          const value = question().value;
+          return Array.isArray(value) ? value : [];
+        };
         let editor: TextareaRenderable | undefined;
         return <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0}>
           <text fg={props.theme.accent} flexShrink={0}>{field.title}{field.required ? " *" : " (optional)"}</text>
@@ -194,19 +221,25 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
             }} scrollY flexGrow={1} flexShrink={1} minHeight={1} maxHeight={8}>
               <For each={choices}>{(choice, i) => <text id={`question-option-${position}-${i()}`}
                 fg={question().highlight === i() ? props.theme.accent : props.theme.text}
-                onMouseDown={() => { update(position, { highlight: i() }); confirm(); }}>
-                {question().highlight === i() ? "> " : "  "}{choice.title}{question().confirmed && choice.value === question().answer ? " (selected)" : ""}
+                onMouseDown={() => {
+                  if (submitted) return;
+                  update(position, { highlight: i() });
+                  if (field.type === "array" && choice.value !== undefined) toggleSelection(i());
+                  else confirm();
+                }}>
+                {question().highlight === i() ? "> " : "  "}{field.type === "array" && typeof choice.value === "string" ? (selected().includes(choice.value) ? "[x] " : "[ ] ") : ""}{choice.title}{question().confirmed && choice.value === question().answer ? " (selected)" : ""}
               </text>}</For>
             </scrollbox>
           </Show>
           <Show when={Object.hasOwn(errors().fields, field.name)}><text fg={props.theme.error}>{errors().fields[field.name]}</text></Show>
-          <text fg={props.theme.muted} flexShrink={0}>{choices.length ? "Up/Down options · Enter select" : "Enter confirm · Ctrl+U " + (field.required ? "clear" : "skip")}</text>
+          <Show when={field.type === "array"}><text fg={props.theme.muted} flexShrink={0}>{selected().length} selected · Ctrl+U {field.required ? "clear" : "skip"}</text></Show>
+          <text fg={props.theme.muted} flexShrink={0}>{field.type === "array" ? "Up/Down options · Space toggle · Enter confirm" : choices.length ? "Up/Down options · Enter select" : "Enter confirm · Ctrl+U " + (field.required ? "clear" : "skip")}</text>
           <Show when={!choices.length}><text fg={props.theme.muted} flexShrink={0}>Ctrl+B/F cursor{field.type === "string" ? " · Shift/Alt+Enter newline" : ""}</text></Show>
         </box>;
       }}</Show>
       <text fg={props.theme.muted} flexShrink={0}>Left/Right questions · Ctrl+E JSON</text>
     </>}>
-      <Show when={form.fallback.length}><text fg={props.theme.warning}>JSON required for: {form.fallback.join(", ")}</text></Show>
+      <Show when={fallback().length}><text fg={props.theme.warning}>JSON required for: {fallback().join(", ")}</text></Show>
       <scrollbox maxHeight={3} scrollY>
         <For each={Object.entries(props.schema.properties ?? {})}>{([name, schema]) => <text fg={props.theme.muted}>{name}: {JSON.stringify(schema)}</text>}</For>
       </scrollbox>

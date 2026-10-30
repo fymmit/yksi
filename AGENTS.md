@@ -43,7 +43,8 @@ from other directories. Bundles require the preload too (see README).
 - `src/storage.ts`: SQLite persistence, workspace-scoped local history.
 - `src/ui/`: Solid components, palette, composer, tool/diff rendering and themes.
   `form.tsx` and `form-state.ts` render and validate keyboard-driven elicitation
-  forms, with JSON fallback for arrays and unsupported widget types.
+  forms, with checkbox multi-selects for finite-choice string arrays and JSON
+  fallback for other arrays and unsupported widget types.
 - `src/demo-agent.ts`: real stdio ACP demo; simulated edits, no model service.
 - `tests/fixtures/agent.ts`: deterministic protocol fixture for lifecycle tests.
 - `bin/acp-tui.ts`, `scripts/build.ts`: launcher and bundle build.
@@ -94,8 +95,14 @@ Text/number answers also use Enter; text uses Shift/Alt+Enter for newlines and
 Ctrl+B/F for cursor movement. Defaults require confirmation, optional questions
 can be explicitly skipped, and the final answer triggers validated submission.
 Ctrl+E switches to JSON with explicit Ctrl+Enter submission; returning to questions
-requires valid JSON without implicitly confirming changed answers. Arrays use
-JSON rather than visual widgets.
+requires valid JSON without implicitly confirming changed answers. Finite-choice
+string arrays use multi-select checkboxes: Up/Down highlights, Space toggles, and
+Enter confirms. Clicks toggle checkboxes without confirming. Selection edits
+require reconfirmation; defaults remain unconfirmed. Ctrl+U skips optional arrays
+or clears required ones; explicit empty selections submit `[]` when valid.
+Array JSON round trips compare contents to retain unchanged confirmations.
+Other arrays and unrepresentable selections (such as duplicates) retain validated
+JSON editing without silently changing values.
 
 The first release targets Linux/macOS. Linux is locally exercised; CI also
 targets macOS. Copilot CLI 1.0.105 was verified for ACP initialization, session
@@ -104,7 +111,7 @@ creation, and advertised commands/settings. Automated tests use offline agents.
 Not yet implemented: remote transports, agent-registry installation, standalone
 native executables, background/multi-agent sessions, remote session discovery,
 image/audio attachments, terminal-based authentication, editable keymaps, Git
-undo/revert, or visual multi-select form widgets.
+undo/revert, or free-form array widgets.
 Demo sessions cannot resume after their process exits; local transcripts remain.
 
 ## Adding an agent
