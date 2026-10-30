@@ -31,7 +31,7 @@ bun run build                 # Bun bundle in dist/ (native deps stay external)
 `bunfig.toml` must preload `@opentui/solid/preload` for **both runtime and tests**.
 Otherwise Bun runs Solid's server implementation / untransformed JSX. The bin
 launcher installs this preload before dynamically importing the app so it works
-from other directories. Bundles require the preload too (see README).
+from other directories. Bundles require the preload too (see docs/development.md).
 
 ## Layout
 
@@ -239,4 +239,4 @@ advertised settings and session load behavior. Use ACP capabilities rather than
 hard-coded agent names. Do not add a provider/model SDK to the TUI.
 
 Docs: https://agentclientprotocol.com/llms.txt and https://opentui.com/docs.
-Update this file and README when architecture, commands or supported behavior changes.
+Update this file and the relevant user/development docs when architecture, commands or supported behavior changes.
