@@ -51,6 +51,9 @@ from other directories. Bundles require the preload too (see README).
 
 ## Conventions and invariants
 
+- Use Conventional Commit-style messages: a lowercase type and colon followed
+  by a concise imperative subject (for example, `feat: add ...`). Add a
+  descriptive body when useful.
 - Keep protocol logic independent of Solid and renderables. Domain state is
   mutable within the controller, published as snapshots, and reconciled into a
   Solid store. Preserve timeline item IDs across streaming updates.
