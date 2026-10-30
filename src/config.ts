@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { z } from "zod";
+import { keybindingsSchema } from "./keybindings";
 
 const agentSchema = z.object({
   command: z.string().min(1),
@@ -9,6 +10,7 @@ const agentSchema = z.object({
   env: z.record(z.string(), z.string()).default({}),
 });
 export const configSchema = z.object({
+  keybindings: keybindingsSchema.optional(),
   defaultAgent: z.string().default("copilot"),
   agents: z.record(z.string(), agentSchema).default({
     copilot: { command: "copilot", args: ["--acp", "--stdio"], env: {} },

@@ -54,8 +54,12 @@ You can also run `bun /absolute/path/to/acp-tui/bin/acp-tui.ts` from any directo
 - SQLite transcript history, supported remote resumption, Markdown export.
 - Responsive sidebar with agent plan, reported diffs and context usage when available.
 - Light/dark themes and sidebar preferences retained across runs.
+- Configurable, context-aware keyboard shortcuts with hints that follow your settings.
 
 ## Keyboard flow
+
+These are the default bindings. See [Custom keybindings](#custom-keybindings) to
+change them.
 
 | Key | Action |
 | --- | --- |
@@ -165,6 +169,101 @@ agent; agent-side tool policies remain in effect. Sign in using the agent's own
 CLI first. Agent-handled ACP authentication methods, when advertised, are also
 available in the command palette.
 
+### Custom keybindings
+
+Add `keybindings` to the same global configuration file (or the file selected by
+`--config`). For example, to send with Ctrl+Enter and insert newlines with Enter:
+
+```json
+{
+  "keybindings": {
+    "app.commands": ["ctrl+p", "f1"],
+    "composer.submit": ["ctrl+enter"],
+    "composer.newline": ["enter", "shift+enter", "alt+enter"],
+    "app.theme": ["alt+t"],
+    "app.sidebar": []
+  }
+}
+```
+
+- Omitted actions inherit their defaults. An array **replaces** an action's
+  shortcuts; `[]` disables its shortcuts. Client commands remain available in
+  the command palette and through `/tui:…` even when their shortcuts are disabled.
+- Changes take effect on restart. Configuration is global, including when the
+  offline demo is selected.
+- Keys are case-insensitive. Use letters, digits, punctuation, `f1`–`f24`, or
+  named keys: `enter`, `escape`, `tab`, `space`, `backspace`, `delete`, `insert`,
+  `home`, `end`, `up`, `down`, `left`, `right`, `pageup`, `pagedown`, `linefeed`.
+  Combine with `ctrl+`, `shift+`, `alt+` (or `meta+`), and `super+`.
+  Aliases include `return`/`kpenter` for Enter, `esc`, `pgup`, `pgdn`, `spacebar`,
+  and `plus`/`minus` for `+`/`-`. For example, use `ctrl+plus` for Ctrl++.
+- Modifiers match exactly: `ctrl+p` does not also match `ctrl+shift+p`. Each entry
+  describes one key combination; leader sequences are not supported.
+- Unknown actions, invalid keys, duplicate alternatives, and conflicts between
+  actions active in the same context produce configuration errors at startup.
+  Rebind or disable the conflicting action as well. A key can be reused in
+  separate contexts, such as `app.sidebar` and `form.cursorLeft`.
+- Application/form bindings take priority over built-in text editing in their
+  active context. Other native editing shortcuts still work. Unmodified letters
+  assigned to an action consume those letters while that action is active.
+- Inline hints show the first configured shortcut; command palette entries show
+  all alternatives. Terminal support determines which combinations can be
+  distinguished: for example, some terminals send Enter for Ctrl+M or cannot
+  distinguish Shift+Enter. Use a combination your terminal can report.
+
+#### Action reference
+
+Application actions are active with the composer, except where noted:
+
+| Action | Default | Behavior |
+| --- | --- | --- |
+| `app.commands` | `ctrl+p` | Open command palette |
+| `app.new` | `ctrl+n` | New session |
+| `app.sessions` | `ctrl+s` | Switch session |
+| `app.agents` | `ctrl+a` | Switch agent |
+| `app.config` | `ctrl+m` | Agent model/mode/settings |
+| `app.files` | `ctrl+f` | Attach file |
+| `app.sidebar` | `ctrl+b` | Toggle sidebar |
+| `app.tools` | `ctrl+o` | Toggle tool details; active everywhere |
+| `app.quit` | `ctrl+q` | Quit; active everywhere |
+| `app.interrupt` | `ctrl+c` | Cancel while busy, otherwise quit; active everywhere |
+| `app.cancel` | `escape` | Close picker, cancel interaction/turn, or clear notice/error |
+| `app.scrollUp` / `app.scrollDown` | `pageup` / `pagedown` | Scroll transcript; also active in pickers/permissions, suspended in forms |
+| `app.clear-attachments` | Unbound | Clear attachments |
+| `app.reconnect` | Unbound | Reconnect current session |
+| `app.thoughts` | Unbound | Toggle reasoning visibility |
+| `app.theme` | Unbound | Toggle theme |
+| `app.earlier` | Unbound | Show earlier messages |
+| `app.export` | Unbound | Export transcript |
+| `app.paths` | Unbound | Show configuration/data paths |
+
+Composer, picker, and interaction actions are active only in their corresponding UI:
+
+| Action | Default | Behavior |
+| --- | --- | --- |
+| `composer.submit` | `enter` | Send prompt or run client command |
+| `composer.newline` | `shift+enter`, `alt+enter` | Insert newline |
+| `composer.complete` | `tab` | Complete `/…` or attach file after `@` |
+| `composer.historyPrevious` / `composer.historyNext` | `ctrl+up` / `ctrl+down` | Browse prompt history |
+| `picker.previous` / `picker.next` | `up` / `down` | Highlight choice |
+| `picker.confirm` | `enter` | Select choice |
+| `permission.previous` / `permission.next` | `up` / `down` | Highlight permission/URL-request option |
+| `permission.confirm` | `enter` | Confirm highlighted agent option |
+| `form.decline` | `ctrl+d` | Decline form, including JSON mode |
+| `form.toggleJson` | `ctrl+e` | Switch questions/JSON |
+| `form.submitJson` | `ctrl+enter` | Validate and submit JSON |
+| `form.jsonNewline` | `enter` | Insert newline in JSON |
+| `form.previous` / `form.next` | `left` / `right` | Revisit question |
+| `form.confirm` | `enter`, `ctrl+enter` | Confirm question and advance |
+| `form.clear` | `ctrl+u` | Skip optional question or clear required answer |
+| `form.optionPrevious` / `form.optionNext` | `up` / `down` | Highlight question option |
+| `form.toggle` | `space` | Toggle highlighted checkbox |
+| `form.cursorLeft` / `form.cursorRight` | `ctrl+b` / `ctrl+f` | Move cursor in text/number answers |
+| `form.newline` | `shift+enter`, `alt+enter` | Insert newline in text/number editor |
+
+Question confirmation, skipping, toggling, and JSON submission ignore key-repeat
+events so holding a key cannot confirm multiple answers. Navigation can repeat.
+
 ## History and data
 
 Stored under `~/.local/share/acp-tui/` (or `$XDG_DATA_HOME/acp-tui/`):
@@ -206,6 +305,6 @@ architecture and guidance for future coding sessions.
 
 This first version implements **stable ACP v1 over local stdio**, with one active
 agent process. Remote transports, remote session discovery, multi-agent/background
-sessions, image/audio input, terminal-auth handoff, Git undo, configurable keymaps,
+sessions, image/audio input, terminal-auth handoff, Git undo, leader-key sequences,
 and standalone binary distribution are future work. Available UI features depend
 on the agent's advertised capabilities.

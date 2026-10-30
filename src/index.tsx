@@ -8,6 +8,7 @@ import { appPaths, demoAgent, loadConfig } from "./config";
 import { Storage } from "./storage";
 import { Controller } from "./controller";
 import { App } from "./ui/app";
+import { defaultKeybindings } from "./keybindings";
 
 async function main() {
   const { values, positionals } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: {
@@ -30,7 +31,8 @@ Configuration: ${appPaths().config}
 Data:          ${appPaths().data}
 
 Copilot: install Copilot CLI and sign in using its CLI before connecting.
-Keyboard: Ctrl+P commands · Ctrl+S sessions · Ctrl+A agents · Esc cancel`);
+Default keyboard: ${defaultKeybindings.hint("app.commands", "commands")} · ${defaultKeybindings.hint("app.sessions", "sessions")} · ${defaultKeybindings.hint("app.agents", "agents")} · ${defaultKeybindings.hint("app.cancel", "cancel")}
+Customize shortcuts with keybindings in your configuration file.`);
     return;
   }
   if (values.version) { console.log("0.1.0"); return; }

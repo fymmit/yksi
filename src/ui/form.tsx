@@ -4,8 +4,12 @@ import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import type { ElicitationSchema } from "@agentclientprotocol/sdk";
 import { createForm, numberValue, questionChoices, questionState, sameAnswer, type FormContent, type FormErrors, type QuestionState } from "./form-state";
 import type { Theme } from "./theme";
+import { defaultKeybindings, type Keybindings } from "../keybindings";
+import { consumeKey, suppressEditorFallback } from "./keybindings";
 
-export function FormView(props: { schema: ElicitationSchema; theme: Theme; answer: (id?: string, content?: FormContent) => void }) {
+export function FormView(props: { schema: ElicitationSchema; theme: Theme; keys?: Keybindings; answer: (id?: string, content?: FormContent) => void }) {
+  const keys = props.keys ?? defaultKeybindings;
+  const hint = keys.hint;
   const form = createForm(props.schema);
   const [fallback, setFallback] = createSignal(form.questionFallback(form.defaults));
   const [json, setJson] = createSignal(fallback().length > 0);
@@ -145,28 +149,26 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
   };
   useKeyboard(key => {
     if (key.defaultPrevented) return;
-    if (submitted) { key.preventDefault(); return; }
-    if (key.ctrl && key.name === "e") { key.preventDefault(); toggleMode(); return; }
+    if (submitted) { consumeKey(key); return; }
+    if (keys.matches("form.toggleJson", key)) { if (consumeKey(key)) toggleMode(); return; }
     if (json()) {
-      if (key.ctrl && key.name === "return") {
-        key.preventDefault(); key.stopPropagation();
-        if (!key.repeated && key.eventType !== "repeat") submitJson();
-      }
+      if (keys.matches("form.submitJson", key)) { if (consumeKey(key)) submitJson(); }
+      else if (keys.matches("form.jsonNewline", key)) { if (consumeKey(key, true)) jsonEditor?.newLine(); }
+      else suppressEditorFallback(key);
       return;
     }
-    if ((key.name === "left" || key.name === "right") && !key.ctrl && !key.meta && !key.shift) {
-      key.preventDefault(); navigate(index() + (key.name === "left" ? -1 : 1)); return;
+    if (keys.matches("form.previous", key) || keys.matches("form.next", key)) {
+      if (consumeKey(key, true)) navigate(index() + (keys.matches("form.previous", key) ? -1 : 1));
+      return;
     }
-    if (key.name === "return" && !key.shift && !key.meta) {
-      key.preventDefault(); key.stopPropagation();
-      if (!key.repeated && key.eventType !== "repeat") confirm();
+    if (keys.matches("form.confirm", key)) {
+      if (consumeKey(key)) confirm();
       return;
     }
     const field = form.fields[index()];
     if (!field) return;
-    if (key.ctrl && key.name === "u") {
-      key.preventDefault(); key.stopPropagation();
-      if (key.repeated || key.eventType === "repeat") return;
+    if (keys.matches("form.clear", key)) {
+      if (!consumeKey(key)) return;
       if (!field.required) confirm(true);
       else {
         activeEditor?.editor.setText("");
@@ -175,16 +177,22 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
       return;
     }
     const choices = questionChoices(field);
-    if (field.type === "array" && key.name === "space" && !key.ctrl && !key.meta && !key.shift) {
-      key.preventDefault(); key.stopPropagation();
-      if (!key.repeated && key.eventType !== "repeat") toggleSelection(questions()[index()]!.highlight);
+    if (choices.length && field.type === "array" && keys.matches("form.toggle", key)) {
+      if (consumeKey(key)) toggleSelection(questions()[index()]!.highlight);
       return;
     }
-    if (choices.length && (key.name === "up" || key.name === "down")) {
-      key.preventDefault();
-      const highlight = Math.max(0, Math.min(choices.length - 1, questions()[index()]!.highlight + (key.name === "up" ? -1 : 1)));
+    if (choices.length && (keys.matches("form.optionPrevious", key) || keys.matches("form.optionNext", key))) {
+      if (!consumeKey(key, true)) return;
+      const highlight = Math.max(0, Math.min(choices.length - 1, questions()[index()]!.highlight + (keys.matches("form.optionPrevious", key) ? -1 : 1)));
       update(index(), { highlight });
       optionsScroll?.scrollChildIntoView(`question-option-${index()}-${highlight}`);
+      return;
+    }
+    if (!choices.length) {
+      if (keys.matches("form.newline", key)) { if (consumeKey(key, true)) activeEditor?.editor.newLine(); return; }
+      if (keys.matches("form.cursorLeft", key)) { if (consumeKey(key, true)) activeEditor?.editor.moveCursorLeft(); return; }
+      if (keys.matches("form.cursorRight", key)) { if (consumeKey(key, true)) activeEditor?.editor.moveCursorRight(); return; }
+      suppressEditorFallback(key, true);
     }
   });
   return <box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0}>
@@ -193,7 +201,7 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
     <Show when={form.schemaError}><text fg={props.theme.error}>{form.schemaError}</text></Show>
     <Show when={json()} fallback={<>
       <text fg={props.theme.muted} flexShrink={0}>Question {form.fields.length ? index() + 1 : 0}/{form.fields.length} · {questions().filter(question => question.confirmed).length} answered</text>
-      <Show when={form.fields[index()]} keyed fallback={<text fg={props.theme.text}>No questions. Press Enter to submit.</text>}>{field => {
+      <Show when={form.fields[index()]} keyed fallback={<text fg={props.theme.text}>No questions. {hint("form.confirm", "to submit")}.</text>}>{field => {
         const position = form.fields.indexOf(field);
         const question = () => questions()[position]!;
         const choices = questionChoices(field);
@@ -209,8 +217,6 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
             <textarea ref={value => { editor = value; activeEditor = { index: position, editor: value }; }} focused height={field.type === "string" ? 3 : 1}
               initialValue={untrack(() => question().text ?? "")} placeholder={field.type === "string" ? "Enter text" : "Enter a number"}
               textColor={props.theme.text} backgroundColor={props.theme.bg} focusedBackgroundColor={props.theme.bg}
-              keyBindings={[{ name: "return", shift: true, action: "newline" }, { name: "return", meta: true, action: "newline" },
-                { name: "b", ctrl: true, action: "move-left" }, { name: "f", ctrl: true, action: "move-right" }]}
               onContentChange={() => {
                 if (editor && editor.plainText !== (question().text ?? "")) update(position, { text: editor.plainText, confirmed: false });
               }} />
@@ -232,12 +238,17 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
             </scrollbox>
           </Show>
           <Show when={Object.hasOwn(errors().fields, field.name)}><text fg={props.theme.error}>{errors().fields[field.name]}</text></Show>
-          <Show when={field.type === "array"}><text fg={props.theme.muted} flexShrink={0}>{selected().length} selected · Ctrl+U {field.required ? "clear" : "skip"}</text></Show>
-          <text fg={props.theme.muted} flexShrink={0}>{field.type === "array" ? "Up/Down options · Space toggle · Enter confirm" : choices.length ? "Up/Down options · Enter select" : "Enter confirm · Ctrl+U " + (field.required ? "clear" : "skip")}</text>
-          <Show when={!choices.length}><text fg={props.theme.muted} flexShrink={0}>Ctrl+B/F cursor{field.type === "string" ? " · Shift/Alt+Enter newline" : ""}</text></Show>
+          <Show when={field.type === "array"}><text fg={props.theme.muted} flexShrink={0}>{selected().length} selected · {hint("form.clear", field.required ? "clear" : "skip")}</text></Show>
+          <text fg={props.theme.muted} flexShrink={0}>{[
+            ...(choices.length ? [hint("form.optionPrevious", "previous option"), hint("form.optionNext", "next option")] : []),
+            ...(field.type === "array" ? [hint("form.toggle", "toggle")] : []),
+            hint("form.confirm", choices.length && field.type !== "array" ? "select" : "confirm"),
+            ...(!choices.length ? [hint("form.clear", field.required ? "clear" : "skip")] : []),
+          ].join(" · ")}</text>
+          <Show when={!choices.length}><text fg={props.theme.muted} flexShrink={0}>{hint("form.cursorLeft", "left")} · {hint("form.cursorRight", "right")}{field.type === "string" ? ` · ${hint("form.newline", "newline")}` : ""}</text></Show>
         </box>;
       }}</Show>
-      <text fg={props.theme.muted} flexShrink={0}>Left/Right questions · Ctrl+E JSON</text>
+      <text fg={props.theme.muted} flexShrink={0}>{hint("form.previous", "back")} · {hint("form.next", "next")} · {hint("form.toggleJson", "JSON")}</text>
     </>}>
       <Show when={fallback().length}><text fg={props.theme.warning}>JSON required for: {fallback().join(", ")}</text></Show>
       <scrollbox maxHeight={3} scrollY>
@@ -245,9 +256,9 @@ export function FormView(props: { schema: ElicitationSchema; theme: Theme; answe
       </scrollbox>
       <textarea ref={jsonEditor} focused flexGrow={1} minHeight={2} maxHeight={6} initialValue={jsonText} textColor={props.theme.text} backgroundColor={props.theme.bg} focusedBackgroundColor={props.theme.bg} />
       <For each={Object.entries(errors().fields)}>{([name, error]) => <text fg={props.theme.error}>{name}: {error}</text>}</For>
-      <text fg={props.theme.muted} flexShrink={0}>Ctrl+E questions · Ctrl+Enter submit</text>
+      <text fg={props.theme.muted} flexShrink={0}>{hint("form.toggleJson", "questions")} · {hint("form.submitJson", "submit")} · {hint("form.jsonNewline", "newline")}</text>
     </Show>
     <Show when={errors().summary}><text fg={props.theme.error}>{errors().summary}</text></Show>
-    <text fg={props.theme.muted} flexShrink={0}>Ctrl+D decline · Esc cancel</text>
+    <text fg={props.theme.muted} flexShrink={0}>{hint("form.decline", "decline")} · {hint("app.cancel", "cancel")}</text>
   </box>;
 }

@@ -35,6 +35,8 @@ from other directories. Bundles require the preload too (see README).
 
 - `src/index.tsx`: CLI parsing, terminal lifecycle, application wiring.
 - `src/config.ts`: validated global agent definitions, XDG paths, demo launch.
+- `src/keybindings.ts`: typed action/default/context registry, validated global
+  overrides, exact key matching, and shortcut labels.
 - `src/acp/client.ts`: SDK fluent client, stdio, capabilities, stderr and timeouts.
 - `src/acp/files.ts`, `src/acp/terminals.ts`: ACP client resource methods.
 - `src/controller.ts`: connection/session lifecycle, permission and question
@@ -78,6 +80,14 @@ from other directories. Bundles require the preload too (see README).
   restore the terminal, close SQLite, and terminate owned process groups.
 - UI state/settings are local. Do not automatically execute project-local agent
   configuration. The only configuration is the global file or explicit --config.
+- Keybindings are startup-loaded overrides in that configuration: omitted actions
+  inherit defaults, arrays replace shortcuts, and `[]` disables them. Contexts
+  permit key reuse only where actions cannot overlap. Keep handlers and hints
+  sourced from `src/keybindings.ts`; inline hints use the first alternative and
+  palette details show all alternatives. No leader sequences. Consume handled
+  keys before other handlers/widgets; suppress managed OpenTUI editor defaults
+  with `src/ui/keybindings.ts` so disabled/remapped keys cannot fall through.
+  Confirmation/submission/toggle actions ignore repeat events; navigation repeats.
 - Keep dependencies pinned via `bun.lock`; do not edit vendored dependencies.
 - Changes to protocol/state/lifecycle need meaningful tests. For UI behavior use
   `testRender`, real key events, and frame assertions; always dispose renderers.
@@ -90,7 +100,7 @@ from other directories. Bundles require the preload too (see README).
 Implemented: stdio agents, streaming Markdown, tool cards/diffs, client file and
 terminal services, permissions, form/URL elicitation, cancellation, local session
 history and advertised resumption, file attachments, dynamic agent commands and
-configuration, themes, sidebar, export and offline demo. Input history is per
+configuration, configurable keybindings, themes, sidebar, export and offline demo. Input history is per
 session; drafts survive session switches within the running TUI.
 Forms show one question at a time: Up/Down highlights boolean/enum options,
 Enter confirms and advances, Left/Right revisits questions with drafts retained.
@@ -113,7 +123,7 @@ creation, and advertised commands/settings. Automated tests use offline agents.
 
 Not yet implemented: remote transports, agent-registry installation, standalone
 native executables, background/multi-agent sessions, remote session discovery,
-image/audio attachments, terminal-based authentication, editable keymaps, Git
+image/audio attachments, terminal-based authentication, leader-key sequences, Git
 undo/revert, or free-form array widgets.
 Demo sessions cannot resume after their process exits; local transcripts remain.
 
