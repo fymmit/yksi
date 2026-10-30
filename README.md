@@ -7,6 +7,9 @@ An agent-agnostic, keyboard-first terminal client for AI coding agents using the
 conversations, tool calls, permissions, sessions, and a command palette into one
 interface. The agent handles models, tools, authentication, and its own configuration.
 
+<img width="746" height="483" alt="image" src="https://github.com/user-attachments/assets/6e707692-879a-4329-a5df-ee1c7318339d" />
+
+
 ## Run
 
 Requires **Bun 1.4.1+** and a modern terminal on Linux or macOS. From this checkout:
