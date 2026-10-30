@@ -50,6 +50,10 @@ from other directories. Bundles require the preload too (see README).
 - `src/state.ts`: serializable conversation model and update reducer.
 - `src/storage.ts`: SQLite persistence, workspace-scoped local history.
 - `src/ui/`: Solid components, palette, composer, tool/diff rendering and themes.
+  `timeline.tsx` renders left-aligned assistant and right-aligned user message cards;
+  `message-time.ts` formats local message times, with full dates outside today.
+  Reasoning, system notices and tools stay outside message cards. Old saved
+  messages without a creation time remain readable without a timestamp.
   `status-bar.tsx` renders a single-line, width-aware session summary with a
   reserved help hint. `help.tsx` renders searchable floating keyboard help from
   the keybinding registry's descriptions and resolved alternatives.

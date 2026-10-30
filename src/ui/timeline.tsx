@@ -1,9 +1,16 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { createTwoFilesPatch } from "diff";
 import type { SyntaxStyle } from "@opentui/core";
-import { contentText, type TimelineItem, type Tool } from "../state";
+import { contentText, type Message, type TimelineItem, type Tool } from "../state";
 import { selectionColors, type Theme } from "./theme";
 import { ThemedMarkdown } from "./markdown";
+import { messageTime } from "./message-time";
+
+function messageLabel(message: Message): string {
+  const label = message.role === "user" ? "You" : "Assistant";
+  const time = messageTime(message.createdAt);
+  return time ? `${label} · ${time}` : label;
+}
 
 function ToolCard(props: {
   tool: Tool;
@@ -130,43 +137,61 @@ export function TimelineEntry(props: {
         keyed
       >
         {message => (
-          <box flexDirection="column" marginBottom={1} paddingX={1} flexShrink={0}>
-            <text
-              {...selectionColors(props.theme)}
-              fg={message.role === "user" ? props.theme.accent : props.theme.muted}
-            >
-              {message.role === "user"
-                ? "You"
-                : message.role === "agent"
-                  ? "Assistant"
-                  : message.role === "thought"
-                    ? "Reasoning"
-                    : "System"}
-            </text>
-            <Show
-              when={message.role === "agent"}
-              fallback={
-                <text
-                  fg={
-                    message.role === "thought" || message.role === "system"
-                      ? props.theme.muted
-                      : props.theme.text
-                  }
-                  selectable
-                  {...selectionColors(props.theme)}
-                >
+          <Show
+            when={message.role === "user" || message.role === "agent"}
+            fallback={
+              <box flexDirection="column" marginBottom={1} paddingX={1} flexShrink={0}>
+                <text {...selectionColors(props.theme)} fg={props.theme.muted}>
+                  {message.role === "thought" ? "Reasoning" : "System"}
+                </text>
+                <text fg={props.theme.muted} selectable {...selectionColors(props.theme)}>
                   {message.text}
                 </text>
-              }
+              </box>
+            }
+          >
+            <box
+              width="100%"
+              flexDirection="row"
+              justifyContent={message.role === "user" ? "flex-end" : "flex-start"}
+              marginBottom={1}
+              flexShrink={0}
             >
-              <ThemedMarkdown
-                content={message.text}
-                syntax={props.syntax}
-                theme={props.theme}
-                streaming={props.streaming}
-              />
-            </Show>
-          </box>
+              <box
+                width="85%"
+                flexDirection="column"
+                border={["top", "bottom", "left", "right"]}
+                borderColor={message.role === "user" ? props.theme.accent : props.theme.border}
+                backgroundColor={
+                  message.role === "user" ? props.theme.selectedBackground : props.theme.panel
+                }
+                paddingX={1}
+              >
+                <text
+                  {...selectionColors(props.theme)}
+                  fg={message.role === "user" ? props.theme.accent : props.theme.muted}
+                >
+                  {messageLabel(message)}
+                </text>
+                <Show
+                  when={message.role === "agent"}
+                  fallback={
+                    <text fg={props.theme.text} selectable {...selectionColors(props.theme)}>
+                      {message.text}
+                    </text>
+                  }
+                >
+                  <ThemedMarkdown
+                    content={message.text}
+                    syntax={props.syntax}
+                    theme={props.theme}
+                    streaming={props.streaming}
+                    background={props.theme.panel}
+                  />
+                </Show>
+              </box>
+            </box>
+          </Show>
         )}
       </Show>
     </>

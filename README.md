@@ -46,6 +46,7 @@ You can also run `bun /absolute/path/to/yksi/bin/yksi.ts` from any directory.
 
 ## Features
 
+- Left-aligned assistant and right-aligned user message cards with local timestamps (full date for earlier days); reasoning and expandable tool calls stay between cards.
 - Streaming Markdown and highlighted code, expandable tool calls and unified diffs.
 - Multiline composer, bracketed paste, per-session prompt history and draft retention.
 - Searchable command, agent, session, file and model/mode pickers.

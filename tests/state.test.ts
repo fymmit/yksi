@@ -44,6 +44,32 @@ test("streamed messages retain boundaries and sparse tool updates preserve conte
   expect(changedFiles(session)).toEqual(["/project/a.ts"]);
 });
 
+test("messages retain their first receipt time through streaming and saved history", () => {
+  const session = newSession("demo", "/project");
+  addMessage(session, "user", "Hello", 1000);
+  applyUpdate(
+    session,
+    { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "First" } },
+    2000,
+  );
+  applyUpdate(
+    session,
+    { sessionUpdate: "agent_message_chunk", content: { type: "text", text: " second" } },
+    3000,
+  );
+  expect(session.items).toHaveLength(2);
+  expect(session.items[0]).toMatchObject({ createdAt: 1000 });
+  expect(session.items[1]).toMatchObject({ createdAt: 2000, text: "First second" });
+
+  const storage = new Storage(":memory:");
+  try {
+    storage.save(session);
+    expect(storage.list(session.cwd)[0]?.items).toEqual(session.items);
+  } finally {
+    storage.close();
+  }
+});
+
 test("command and plan snapshots replace old values; persistence isolates workspaces", () => {
   const storage = new Storage(":memory:");
   try {

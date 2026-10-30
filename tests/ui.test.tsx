@@ -5,7 +5,7 @@ import { Controller } from "../src/controller";
 import { Storage } from "../src/storage";
 import { configSchema, demoAgent } from "../src/config";
 import { resolve } from "node:path";
-import { applyUpdate } from "../src/state";
+import { addMessage, applyUpdate } from "../src/state";
 
 async function waitForWorkerFrame(
   setup: Awaited<ReturnType<typeof testRender>>,
@@ -92,6 +92,126 @@ test("reactive streaming and expanded diffs render after initial mount", async (
     );
     expect(setup.captureCharFrame()).toContain("First chunk and second chunk.");
     expect(setup.captureCharFrame()).toContain("goodbye");
+  } finally {
+    controller.dispose();
+    await setup.dispose();
+    storage.close();
+  }
+});
+
+test("chat cards align by speaker with timestamps while tools and notices stay between cards", async () => {
+  const storage = new Storage(":memory:");
+  const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");
+  const setup = await testRender(
+    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    { width: 110, height: 35 },
+  );
+  try {
+    await setup.renderOnce();
+    addMessage(
+      controller.session,
+      "user",
+      "Please review this",
+      new Date(2025, 9, 29, 9, 5).getTime(),
+    );
+    applyUpdate(controller.session, {
+      sessionUpdate: "tool_call",
+      toolCallId: "read",
+      title: "Read file",
+      status: "completed",
+    });
+    applyUpdate(controller.session, {
+      sessionUpdate: "agent_thought_chunk",
+      content: { type: "text", text: "Private reasoning" },
+    });
+    applyUpdate(
+      controller.session,
+      { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Looks good." } },
+      new Date(2024, 9, 30, 14, 32).getTime(),
+    );
+    addMessage(controller.session, "system", "Review complete");
+    controller.emit("change", controller.snapshot());
+    await waitForWorkerFrame(setup, frame => frame.includes("Looks good."));
+    let frame = setup.captureCharFrame();
+    expect(frame).toContain("You · Oct 29, 2025, 09:05");
+    expect(frame).toContain("Assistant · Oct 30, 2024, 14:32");
+    expect(frame.indexOf("Please review this")).toBeLessThan(frame.indexOf("Read file"));
+    expect(frame.indexOf("Read file")).toBeLessThan(frame.indexOf("Looks good."));
+    expect(frame.indexOf("Looks good.")).toBeLessThan(frame.indexOf("Review complete"));
+    expect(frame).not.toContain("Private reasoning");
+    const lines = frame.split("\n");
+    const user = lines.find(line => line.includes("You ·"))!;
+    const agent = lines.find(line => line.includes("Assistant ·"))!;
+    const tool = lines.find(line => line.includes("Read file"))!;
+    const notice = lines.find(line => line.includes("Review complete"))!;
+    expect(user.indexOf("You ·")).toBeGreaterThan(agent.indexOf("Assistant ·"));
+    expect(tool.indexOf("Read file")).toBeLessThan(user.indexOf("You ·"));
+    expect(notice.indexOf("Review complete")).toBeLessThan(user.indexOf("You ·"));
+
+    setup.resize(55, 30);
+    await waitForWorkerFrame(
+      setup,
+      value => value.split("\n")[0]!.length <= 55 && value.includes("Looks good."),
+    );
+    frame = setup.captureCharFrame();
+    expect(frame).toContain("Please review this");
+    expect(frame).toContain("Assistant · Oct 30, 2024, 14:32");
+    expect(
+      frame
+        .split("\n")
+        .find(line => line.includes("You ·"))!
+        .indexOf("You ·"),
+    ).toBeGreaterThan(
+      frame
+        .split("\n")
+        .find(line => line.includes("Assistant ·"))!
+        .indexOf("Assistant ·"),
+    );
+
+    setup.mockInput.pressKey("p", { ctrl: true });
+    await setup.renderOnce();
+    await setup.mockInput.typeText("Show / hide reasoning");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
+    frame = setup.captureCharFrame();
+    expect(frame.indexOf("Read file")).toBeLessThan(frame.indexOf("Private reasoning"));
+    expect(frame.indexOf("Private reasoning")).toBeLessThan(frame.indexOf("Looks good."));
+    expect(
+      frame
+        .split("\n")
+        .find(line => line.includes("Private reasoning"))!
+        .indexOf("Private reasoning"),
+    ).toBeLessThan(
+      frame
+        .split("\n")
+        .find(line => line.includes("You ·"))!
+        .indexOf("You ·"),
+    );
+  } finally {
+    controller.dispose();
+    await setup.dispose();
+    storage.close();
+  }
+});
+
+test("older transcripts render message cards without inventing timestamps", async () => {
+  const storage = new Storage(":memory:");
+  const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");
+  controller.session.items.push({
+    id: "legacy",
+    type: "message",
+    role: "user",
+    text: "Old prompt",
+  });
+  const setup = await testRender(
+    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    { width: 70, height: 20 },
+  );
+  try {
+    await setup.renderOnce();
+    const frame = setup.captureCharFrame();
+    expect(frame).toContain("Old prompt");
+    expect(frame.split("\n").some(line => /│ You\s+│/.test(line))).toBe(true);
   } finally {
     controller.dispose();
     await setup.dispose();

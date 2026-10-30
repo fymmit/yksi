@@ -5,6 +5,8 @@ export type Message = {
   type: "message";
   role: "user" | "agent" | "thought" | "system";
   text: string;
+  /** Local creation/receipt time; absent on transcripts saved before timestamps existed. */
+  createdAt?: number;
   messageId?: string | null;
 };
 export type Tool = { id: string; type: "tool" } & acp.ToolCall;
@@ -60,8 +62,13 @@ export function contentText(content: acp.ContentBlock): string {
   }
 }
 
-export function addMessage(session: Session, role: Message["role"], text: string) {
-  session.items.push({ id: crypto.randomUUID(), type: "message", role, text });
+export function addMessage(
+  session: Session,
+  role: Message["role"],
+  text: string,
+  createdAt = Date.now(),
+) {
+  session.items.push({ id: crypto.randomUUID(), type: "message", role, text, createdAt });
   session.updatedAt = Date.now();
 }
 
@@ -92,6 +99,7 @@ export function applyUpdate(session: Session, update: acp.SessionUpdate, receive
           type: "message",
           role,
           text,
+          createdAt: receivedAt,
           messageId: update.messageId,
         });
       break;
@@ -142,6 +150,7 @@ export function applyUpdate(session: Session, update: acp.SessionUpdate, receive
         session,
         "system",
         `${update.title}${update.description ? `\n${update.description}` : ""}`,
+        receivedAt,
       );
       break;
   }

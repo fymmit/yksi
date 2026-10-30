@@ -19,6 +19,7 @@ export function ThemedMarkdown(props: {
   syntax: SyntaxStyle;
   theme: Theme;
   streaming: boolean;
+  background?: string;
 }) {
   const renderer = useRenderer();
   const selected = new WeakMap<Renderable, Theme>();
@@ -59,10 +60,10 @@ export function ThemedMarkdown(props: {
           showBorders: block.showBorders,
           borderStyle: block.borderStyle,
           borderColor: theme.markdown.tableBorder,
-          borderBackgroundColor: theme.background,
-          backgroundColor: theme.background,
+          borderBackgroundColor: props.background ?? theme.background,
+          backgroundColor: props.background ?? theme.background,
           fg: theme.text,
-          bg: theme.background,
+          bg: props.background ?? theme.background,
           selectable: true,
           ...selectionColors(theme),
         });
@@ -79,7 +80,7 @@ export function ThemedMarkdown(props: {
       content={props.content}
       syntaxStyle={props.syntax}
       fg={props.theme.text}
-      bg={props.theme.background}
+      bg={props.background ?? props.theme.background}
       streaming={props.streaming}
       tableOptions={{ borderColor: props.theme.markdown.tableBorder }}
       renderNode={renderNode()}
