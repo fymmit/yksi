@@ -418,6 +418,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         flexDirection="row"
       >
         <text fg={theme().accent}>ACP TUI / {basename(state.session.cwd)}</text>
+        <text fg={theme().text}>{state.session.title}</text>
         <text fg={theme().muted}>
           {state.agentName ?? state.session.agent} · {state.status}
         </text>

@@ -93,28 +93,35 @@ test("compact status summarizes sidebar data, adapts to width and preserves the 
     setup.controller.emit("change", setup.controller.snapshot());
     await setup.renderOnce();
     for (const text of [
-      "Fix login",
-      "copilot",
       "Model: Friendly model",
       "Mode: On",
-      "Context 24k/128k",
-      "USD 0.00",
-      "Plan 1/2",
-      "1 file",
+      "Context: 24k/128k",
+      "Cost: USD 0.00",
+      "Plan: 1/2",
+      "Files: 1",
       "F1 Help",
     ])
       expect(setup.footer()).toContain(text);
+    expect(setup.footer()).not.toContain("Fix login");
+    expect(setup.footer()).not.toContain("copilot");
     expect(setup.captureCharFrame()).toContain("Reported diffs");
     expect(setup.captureCharFrame()).not.toContain("Ctrl+B hide sidebar");
+    setup.resize(99, 24);
+    await setup.renderOnce();
+    expect(setup.footer().split("F1 Help")[0]!.trim()).toBe(
+      "Mode: On · …endly model · 24k/128k · USD 0.00 · 1/2 · 1 file",
+    );
     setup.resize(60, 24);
     await setup.renderOnce();
-    expect(setup.footer()).toContain("Ctx 24k/128k");
+    expect(setup.footer()).toContain("24k/128k");
     expect(setup.footer()).toContain("USD 0.00");
     expect(setup.footer()).toContain("Mode: On");
+    expect(setup.footer()).not.toContain("Model:");
+    expect(setup.footer()).not.toContain("Context:");
     expect(setup.footer()).toEndWith("F1 Help");
     expect(setup.captureCharFrame()).not.toContain("Reported diffs");
     for (const [cost, text] of [
-      [null, "Cost: Not reported"],
+      [null, "Not reported"],
       [{ currency: "EUR", amount: 0.5 }, "EUR 0.50"],
     ] as const) {
       applyUpdate(setup.controller.session, {
@@ -125,11 +132,15 @@ test("compact status summarizes sidebar data, adapts to width and preserves the 
       });
       setup.controller.emit("change", setup.controller.snapshot());
       await setup.renderOnce();
-      expect(setup.footer()).toContain("Ctx 25k/128k");
+      expect(setup.footer()).toContain("25k/128k");
       expect(setup.footer()).toContain(text);
+      expect(setup.footer()).not.toContain("Cost:");
     }
     setup.resize(100, 35);
     await setup.renderOnce();
+    expect(setup.footer()).toContain("Context: 25k/128k");
+    expect(setup.footer()).toContain("Cost: EUR 0.50");
+    expect(setup.footer()).toContain("Mode: On");
     expect(setup.captureCharFrame()).toContain("Reported diffs");
     setup.mockInput.pressKey("b", { ctrl: true });
     setup.resize(180, 35);
@@ -142,6 +153,192 @@ test("compact status summarizes sidebar data, adapts to width and preserves the 
       setup.resize(width, 24);
       await setup.renderOnce();
       expect(setup.footer()).toEndWith("F1 Help");
+      expect(Bun.stringWidth(setup.footer())).toBeLessThanOrEqual(width - 2);
+    }
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("status field ordering is independent of agent option order and terminal width", async () => {
+  const setup = await renderApp({}, 220);
+  try {
+    setup.controller.session.configOptions = [
+      { id: "z", name: "Zeta", type: "boolean", currentValue: true },
+      {
+        id: "effort",
+        name: "Effort",
+        category: "thought_level",
+        type: "select",
+        currentValue: "high",
+        options: [{ value: "high", name: "High" }],
+      },
+      {
+        id: "model",
+        name: "Model",
+        category: "model",
+        type: "select",
+        currentValue: "m1",
+        options: [{ value: "m1", name: "M1" }],
+      },
+      { id: "a", name: "Alpha", type: "boolean", currentValue: false },
+      {
+        id: "mode",
+        name: "Mode",
+        category: "mode",
+        type: "select",
+        currentValue: "build",
+        options: [{ value: "build", name: "Build" }],
+      },
+    ];
+    applyUpdate(setup.controller.session, {
+      sessionUpdate: "usage_update",
+      used: 1000,
+      size: 2000,
+      cost: { currency: "USD", amount: 0.5 },
+    });
+    applyUpdate(setup.controller.session, {
+      sessionUpdate: "plan",
+      entries: [{ content: "Implement", priority: "medium", status: "pending" }],
+    });
+    applyUpdate(setup.controller.session, {
+      sessionUpdate: "tool_call",
+      toolCallId: "edit",
+      title: "Edit",
+      content: [{ type: "diff", path: "/project/file.ts", oldText: "old", newText: "new" }],
+    });
+    for (let order = 0; order < 2; order++) {
+      setup.controller.emit("change", setup.controller.snapshot());
+      for (const [width, expected] of [
+        [
+          220,
+          "Mode: Build · Model: M1 · Effort: High · Context: 1k/2k · Cost: USD 0.50 · Plan: 0/1 · Files: 1 · Alpha: Off · Zeta: On",
+        ],
+        [99, "Build · M1 · High · 1k/2k · USD 0.50 · 0/1 · 1 file · Alpha: Off · Zeta: On"],
+        [40, "Build · M1 · 1k/2k · USD 0.50"],
+      ] as const) {
+        setup.resize(width, 35);
+        await setup.renderOnce();
+        expect(setup.footer().split("F1 Help")[0]!.trim()).toBe(expected);
+      }
+      setup.controller.session.configOptions.reverse();
+    }
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test.each(["config", "legacy"])("%s mode labels follow the layout breakpoint", async source => {
+  const setup = await renderApp({}, 100);
+  try {
+    if (source === "config") {
+      setup.controller.session.configOptions = [
+        {
+          id: "mode",
+          name: "Session Mode",
+          category: "mode",
+          type: "select",
+          currentValue: "build",
+          options: [{ value: "build", name: "Build" }],
+        },
+        { id: "extra", name: "Extra", type: "boolean", currentValue: false },
+      ];
+    } else {
+      setup.controller.session.modes = {
+        currentModeId: "build",
+        availableModes: [{ id: "build", name: "Build" }],
+      };
+    }
+    setup.controller.emit("change", setup.controller.snapshot());
+    for (const width of [100, 99, 100]) {
+      setup.resize(width, 35);
+      await setup.renderOnce();
+      const summary = setup.footer().split("F1 Help")[0]!.trim();
+      expect(summary).toBe(
+        source === "config"
+          ? width < 100
+            ? "Build · Extra: Off"
+            : "Session Mode: Build · Extra: Off"
+          : width < 100
+            ? "Build"
+            : "Mode: Build",
+      );
+    }
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test.each(["On", "Off", "Yes", "No", "True", "False", "Enabled", "Disabled"])(
+  "toggle-like select value %s keeps its setting label in both layouts",
+  async name => {
+    const setup = await renderApp({}, 100);
+    try {
+      setup.controller.session.configOptions = [
+        {
+          id: "allow_all",
+          name: "Allow All",
+          category: "permissions",
+          type: "select",
+          currentValue: name.toLowerCase(),
+          options: [
+            { value: "on", name: "On" },
+            { value: "off", name: "Off" },
+            ...(!["On", "Off"].includes(name) ? [{ value: name.toLowerCase(), name }] : []),
+          ],
+        },
+      ];
+      setup.controller.emit("change", setup.controller.snapshot());
+      for (const width of [100, 99, 30]) {
+        setup.resize(width, 35);
+        await setup.renderOnce();
+        expect(setup.footer().split("F1 Help")[0]!.trim()).toBe(`Allow All: ${name}`);
+      }
+    } finally {
+      await setup.cleanup();
+    }
+  },
+);
+
+test.each([
+  {
+    category: "model",
+    name: "namespace/provider/👩‍💻e\u0301模型-v2",
+    slim: "…/👩‍💻e\u0301模型-v2",
+    wide: "…provider/👩‍💻e\u0301模型-v2",
+  },
+  {
+    category: "mode",
+    name: "Planning with confirmations",
+    slim: "Planning wi…",
+    wide: "Planning with confi…",
+  },
+  {
+    category: undefined,
+    name: "Detailed explanations",
+    slim: "Detailed ex…",
+    wide: "Detailed explanatio…",
+  },
+])("status truncates $category values in the appropriate direction", async entry => {
+  const setup = await renderApp({}, 100);
+  try {
+    setup.controller.session.configOptions = [
+      {
+        id: "setting",
+        name: "Setting",
+        category: entry.category,
+        type: "select",
+        currentValue: "selected",
+        options: [{ value: "selected", name: entry.name }],
+      },
+    ];
+    setup.controller.emit("change", setup.controller.snapshot());
+    for (const width of [100, 99, 100]) {
+      setup.resize(width, 35);
+      await setup.renderOnce();
+      expect(setup.footer().split("F1 Help")[0]!.trim()).toBe(
+        width < 100 ? entry.slim : `Setting: ${entry.wide}`,
+      );
       expect(Bun.stringWidth(setup.footer())).toBeLessThanOrEqual(width - 2);
     }
   } finally {

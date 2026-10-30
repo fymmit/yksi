@@ -139,8 +139,19 @@ Implemented: stdio agents, streaming Markdown, tool cards/diffs, client file and
 terminal services, permissions, form/URL elicitation, cancellation, local session
 history and advertised resumption, file attachments, dynamic agent commands and
 configuration, configurable keybindings, themes, sidebar, export and offline demo.
-The footer summarizes session identity/settings, context/cost, completed/total
-plan steps, and reported-diff file count. Lower-priority fields are omitted at
+The footer summarizes settings, context/cost, completed/total plan steps, and
+reported-diff file count. At 100+ columns every displayed field has a label;
+below 100 columns fields show values only, including legacy modes, except boolean
+settings and toggle-like select values (On/Off, Yes/No, True/False, Enabled/Disabled,
+case-insensitive) retain their labels (`Allow All: Off`), and file counts retain
+their unit (`1 file` / `3 files`).
+Truncate model values from the start and other setting values/labels from the end,
+preserving graphemes and terminal-cell widths. Context, cost, plan progress, and
+file counts stay whole or are omitted.
+Footer display order is mode, model, thought_level (effort), context, cost, plan,
+files, then other settings, with config IDs breaking ties. Space allocation still
+prioritizes context/cost, then mode/model/effort, plan, files, and other settings.
+Lower-priority fields are omitted at
 narrow widths; a configurable help hint remains at the right. The sidebar remains
 visible by default at 100+ columns, respecting the saved preference. F1 (`app.help`),
 **Keyboard shortcuts**, and `/tui:help` open a searchable floating reference with

@@ -89,11 +89,21 @@ Arrow keys and Enter select in pickers and permission prompts. Tool headers are
 also clickable, and the conversation supports mouse scrolling. If Shift+Enter is
 not distinguishable in your terminal, use Alt+Enter.
 
-The bottom status bar summarizes the session title, agent, settings (prioritizing
-model and mode), reported context/cost, completed/total plan steps, and the number
+The bottom status bar summarizes settings (prioritizing model and mode),
+reported context/cost, completed/total plan steps, and the number
 of files with reported diffs. It uses readable setting choices and compact counts.
-Narrow terminals shorten labels and omit lower-priority fields, keeping usage and
-the help shortcut visible when space permits. The sidebar shows the full details;
+Fields appear in a fixed order: Mode, Model, Effort (ACP `thought_level`), Context,
+Cost, Plan, Files, then other settings sorted by ACP ID. Settings in the same
+category are also sorted by ID.
+At **100 columns or wider**, all displayed fields have labels. Below 100 columns,
+fields show values only, except boolean settings and toggle-like select values
+(On/Off, Yes/No, True/False, Enabled/Disabled) retain their labels (such as
+`Allow All: Off`). File counts retain their unit (such as `1 file` or `3 files`). Narrow terminals shorten
+values and omit lower-priority fields, keeping usage and
+the help shortcut visible when space permits. Long model names lose their beginning
+to preserve the model/version suffix; other setting values and labels lose their
+end. Context, cost, plan progress, and file counts are displayed whole or omitted.
+The sidebar shows the full details;
 it remains visible by default at **100 columns or wider**, respecting your saved
 visibility preference.
 

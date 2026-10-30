@@ -9,17 +9,33 @@ const numbers = new Intl.NumberFormat("en-US", { notation: "compact", maximumFra
 const segments = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const singleLine = (text: string) => text.replace(/[\r\n\t]/g, " ");
 
+// Display order is independent of which fields get space first on narrow terminals.
+const fieldLayout = {
+  mode: { order: 0, priority: 2 },
+  model: { order: 1, priority: 3 },
+  thought_level: { order: 2, priority: 4 },
+  context: { order: 3, priority: 0 },
+  cost: { order: 4, priority: 1 },
+  plan: { order: 5, priority: 5 },
+  files: { order: 6, priority: 6 },
+  other: { order: 7, priority: 9 },
+};
+type FieldKind = keyof typeof fieldLayout;
+
 /** Truncate by terminal cells without splitting a grapheme or a wide character. */
-function fit(text: string, width: number) {
+function fit(text: string, width: number, truncate: "start" | "end" = "end") {
   text = singleLine(text);
   if (Bun.stringWidth(text) <= width) return text;
   if (width <= 0) return "";
+  const graphemes = Array.from(segments.segment(text), value => value.segment);
+  if (truncate === "start") graphemes.reverse();
   let result = "";
-  for (const { segment } of segments.segment(text)) {
-    if (Bun.stringWidth(result + segment) > width - 1) break;
-    result += segment;
+  for (const segment of graphemes) {
+    const next = truncate === "start" ? segment + result : result + segment;
+    if (Bun.stringWidth(next) > width - 1) break;
+    result = next;
   }
-  return result + "…";
+  return truncate === "start" ? "…" + result : result + "…";
 }
 
 export function StatusBar(props: {
@@ -33,11 +49,13 @@ export function StatusBar(props: {
   const summary = createMemo(() => {
     const session = props.session;
     const compact = props.width < 100;
-    const fields: { text: string; priority: number }[] = [];
-    const add = (text: string, priority: number) =>
-      fields.push({ text: singleLine(text), priority });
-    add(fit(session.title, compact ? 12 : 24), 8);
-    add(fit(session.agent, 16), 7);
+    const fields: { text: string; kind: FieldKind; id: string }[] = [];
+    const add = (kind: FieldKind, label: string, value: string, id = "", forceLabel = false) =>
+      fields.push({
+        text: singleLine(compact && !forceLabel ? value : `${label}: ${value}`),
+        kind,
+        id,
+      });
     for (const option of session.configOptions) {
       const value =
         option.type === "boolean"
@@ -47,32 +65,63 @@ export function StatusBar(props: {
           : (option.options
               .flatMap(value => ("options" in value ? value.options : [value]))
               .find(value => value.value === option.currentValue)?.name ?? option.currentValue);
-      const priority = option.category === "mode" ? 2 : option.category === "model" ? 3 : 9;
-      add(`${fit(option.name, 12)}: ${fit(String(value), compact ? 12 : 20)}`, priority);
+      const kind =
+        option.category === "mode" ||
+        option.category === "model" ||
+        option.category === "thought_level"
+          ? option.category
+          : "other";
+      add(
+        kind,
+        fit(option.name, 12),
+        fit(String(value), compact ? 12 : 20, option.category === "model" ? "start" : "end"),
+        option.id,
+        option.type === "boolean" ||
+          /^(on|off|yes|no|true|false|enabled|disabled)$/i.test(String(value).trim()),
+      );
     }
     const mode = sessionMode(session);
     if (mode && !mode.configId)
       add(
-        `Mode: ${fit(mode.options.find(value => value.value === mode.currentValue)?.name ?? String(mode.currentValue), compact ? 12 : 20)}`,
-        2,
+        "mode",
+        "Mode",
+        fit(
+          mode.options.find(value => value.value === mode.currentValue)?.name ??
+            String(mode.currentValue),
+          compact ? 12 : 20,
+        ),
       );
     if (session.usage) {
       add(
-        `${compact ? "Ctx" : "Context"} ${numbers.format(session.usage.used).toLowerCase()}/${numbers.format(session.usage.size).toLowerCase()}`,
-        0,
+        "context",
+        "Context",
+        `${numbers.format(session.usage.used).toLowerCase()}/${numbers.format(session.usage.size).toLowerCase()}`,
       );
-      add(session.usage.cost == null ? "Cost: Not reported" : formatCost(session.usage.cost), 1);
+      add(
+        "cost",
+        "Cost",
+        session.usage.cost == null ? "Not reported" : formatCost(session.usage.cost),
+      );
     }
     if (session.plan.length)
       add(
-        `Plan ${session.plan.filter(entry => entry.status === "completed").length}/${session.plan.length}`,
-        4,
+        "plan",
+        "Plan",
+        `${session.plan.filter(entry => entry.status === "completed").length}/${session.plan.length}`,
       );
     const count = changedFiles(session).length;
-    if (count) add(`${count} ${count === 1 ? "file" : "files"}`, 5);
+    if (count)
+      add("files", "Files", compact ? `${count} ${count === 1 ? "file" : "files"}` : String(count));
+    fields.sort(
+      (a, b) =>
+        fieldLayout[a.kind].order - fieldLayout[b.kind].order ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
     let remaining = Math.max(0, props.width - 2 - Bun.stringWidth(help()) - 2);
     const selected = new Set<(typeof fields)[number]>();
-    for (const field of [...fields].sort((a, b) => a.priority - b.priority)) {
+    for (const field of [...fields].sort(
+      (a, b) => fieldLayout[a.kind].priority - fieldLayout[b.kind].priority,
+    )) {
       const width = Bun.stringWidth(field.text) + (selected.size ? 3 : 0);
       if (width <= remaining) {
         selected.add(field);
