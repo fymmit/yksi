@@ -11,6 +11,8 @@ export type Message = {
 };
 export type Tool = { id: string; type: "tool" } & acp.ToolCall;
 export type TimelineItem = Message | Tool;
+/** Submitted composer input, kept separate from transcript display and ACP replay. */
+export type InputHistoryEntry = { text: string; attachments: string[] };
 export type Session = {
   id: string;
   agent: string;
@@ -19,6 +21,8 @@ export type Session = {
   title: string;
   updatedAt: number;
   items: TimelineItem[];
+  /** Optional for transcripts saved before input history was introduced. */
+  inputHistory?: InputHistoryEntry[];
   plan: acp.PlanEntry[];
   commands: acp.AvailableCommand[];
   configOptions: acp.SessionConfigOption[];
@@ -37,6 +41,7 @@ export function newSession(agent: string, cwd: string): Session {
     title: "New session",
     updatedAt: Date.now(),
     items: [],
+    inputHistory: [],
     plan: [],
     commands: [],
     configOptions: [],

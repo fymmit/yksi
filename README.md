@@ -48,7 +48,7 @@ You can also run `bun /absolute/path/to/yksi/bin/yksi.ts` from any directory.
 
 - Left-aligned assistant and right-aligned user message cards with local timestamps (full date for earlier days); reasoning and expandable tool calls stay between cards.
 - Streaming Markdown and highlighted code, expandable tool calls and unified diffs.
-- Multiline composer, bracketed paste, per-session prompt history and draft retention.
+- Multiline composer, bracketed paste, per-session message/command history and draft retention.
 - Searchable command, agent, session, file and model/mode pickers.
 - Agent-advertised commands and configuration, including boolean options.
 - Remembered model selections per agent, across new sessions and application restarts.
@@ -80,7 +80,7 @@ change them.
 | Ctrl+F                  | Attach a text file                                                  |
 | Tab after `/…`          | Complete a slash command                                            |
 | Tab after `@`           | Open the file picker                                                |
-| Ctrl+Up / Ctrl+Down     | Prompt history                                                      |
+| Up / Down               | Move in multiline text; browse submitted input at the edges         |
 | Ctrl+O                  | Expand/collapse tool details, including during permissions          |
 | Ctrl+B                  | Toggle sidebar (automatically hidden in narrow terminals)           |
 | PageUp / PageDown       | Scroll conversation                                                 |
@@ -91,6 +91,12 @@ change them.
 Arrow keys and Enter select in pickers and permission prompts. Tool headers are
 also clickable, and the conversation supports mouse scrolling. If Shift+Enter is
 not distinguishable in your terminal, use Alt+Enter.
+
+In the composer, Up/Down move through multiline text (including wrapped lines)
+before browsing the current session's submitted messages and typed commands.
+Down returns to your unsent draft; editing a recalled entry does not change saved
+history. Attachments are restored when recalling a submitted message. Older saved
+transcripts can still browse their sent messages.
 
 The bottom status bar summarizes settings (prioritizing model and mode),
 reported context/cost, completed/total plan steps, and the number
@@ -405,7 +411,7 @@ Composer, picker, help, and interaction actions are active only in their corresp
 | `composer.submit`                                   | `enter`                    | Send prompt or run client command               |
 | `composer.newline`                                  | `shift+enter`, `alt+enter` | Insert newline                                  |
 | `composer.complete`                                 | `tab`                      | Complete `/…` or attach file after `@`          |
-| `composer.historyPrevious` / `composer.historyNext` | `ctrl+up` / `ctrl+down`    | Browse prompt history                           |
+| `composer.historyPrevious` / `composer.historyNext` | `up` / `down`              | Browse submitted input at composer edges        |
 | `picker.previous` / `picker.next`                   | `up` / `down`              | Highlight choice                                |
 | `picker.confirm`                                    | `enter`                    | Select choice                                   |
 | `help.previous` / `help.next`                       | `up` / `down`              | Scroll shortcut reference                       |

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { Controller, type Snapshot } from "../src/controller";
 import { demoAgent } from "../src/config";
 import { Storage } from "../src/storage";
+import { addMessage } from "../src/state";
 import type { ClientEvents } from "../src/acp/client";
 
 function setup() {
@@ -46,6 +47,9 @@ test("stdio handshake, command discovery, permission, streamed tool output and p
     const last = controller.session.items.at(-1);
     expect(last?.type === "message" && last.text.includes("Welcome to yksi")).toBe(true);
     expect(controller.storage.list(controller.cwd)[0]?.items).toEqual(controller.session.items);
+    expect(controller.storage.list(controller.cwd)[0]?.inputHistory).toEqual([
+      { text: "Show me the flow", attachments: [] },
+    ]);
     await controller.setMode("plan");
     expect(controller.session.modes?.currentModeId).toBe("plan");
     await controller.cycleMode();
@@ -150,6 +154,7 @@ test("failed remote load preserves a readable local transcript", async () => {
     await controller.open(saved);
     expect(controller.status).toBe("history");
     expect(controller.session.items).toEqual(saved.items);
+    expect(controller.session.inputHistory).toEqual(saved.inputHistory);
     expect(controller.error).toContain("lifetime");
   } finally {
     dispose();
@@ -174,6 +179,8 @@ test("successful session load replaces local history rather than duplicating rep
   try {
     await controller.open();
     await controller.send("Run a command");
+    controller.recordInput("/tui:usage");
+    const inputs = structuredClone(controller.session.inputHistory);
     expect(Object.values(controller.session.terminalOutput ?? {})).toEqual([
       "terminal through ACP\n",
     ]);
@@ -184,6 +191,45 @@ test("successful session load replaces local history rather than duplicating rep
       role: "agent",
       text: "Authoritative replay",
     });
+    expect(controller.session.inputHistory).toEqual(inputs);
+    expect(controller.storage.list(controller.cwd)[0]?.inputHistory).toEqual(inputs);
+  } finally {
+    dispose();
+  }
+});
+
+test("failed attachments are not recorded, successful ones retain their original paths", async () => {
+  const { controller, dispose } = setup();
+  try {
+    await controller.open();
+    await controller.send("inspect", ["missing-file-that-does-not-exist"]);
+    expect(controller.session.inputHistory).toEqual([]);
+    await controller.send("/help", ["package.json"]);
+    expect(controller.session.inputHistory).toEqual([
+      { text: "/help", attachments: ["package.json"] },
+    ]);
+    expect(controller.storage.list(controller.cwd)[0]?.inputHistory).toEqual(
+      controller.session.inputHistory,
+    );
+  } finally {
+    dispose();
+  }
+});
+
+test("the first new submission retains browsable messages from older transcripts", () => {
+  const { controller, dispose } = setup();
+  try {
+    controller.session.inputHistory = undefined;
+    addMessage(controller.session, "user", "old message");
+    addMessage(controller.session, "agent", "old response");
+    controller.recordInput("/tui:usage");
+    expect(controller.snapshot().session.inputHistory).toEqual([
+      { text: "old message", attachments: [] },
+      { text: "/tui:usage", attachments: [] },
+    ]);
+    expect(controller.storage.list(controller.cwd)[0]?.inputHistory).toEqual(
+      controller.snapshot().session.inputHistory,
+    );
   } finally {
     dispose();
   }

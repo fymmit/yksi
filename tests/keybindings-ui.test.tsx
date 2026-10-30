@@ -9,6 +9,7 @@ import { Storage } from "../src/storage";
 import { configSchema } from "../src/config";
 import { resolveKeybindings, type KeyOverrides } from "../src/keybindings";
 import type { FormContent } from "../src/ui/form-state";
+import { addMessage, newSession } from "../src/state";
 
 async function renderApp(keybindings: KeyOverrides) {
   const storage = new Storage(":memory:");
@@ -22,8 +23,9 @@ async function renderApp(keybindings: KeyOverrides) {
   let quits = 0;
   let cancellations = 0;
   controller.status = "ready";
-  controller.send = async text => {
+  controller.send = async (text, attachments) => {
     prompts.push(text);
+    controller.recordInput(text, attachments);
   };
   controller.cancel = async () => {
     cancellations++;
@@ -290,6 +292,127 @@ test("disabled submit and newline do not fall through to textarea defaults", asy
     expect(setup.prompts).toEqual([]);
     expect(setup.captureCharFrame()).toContain("ab");
     expect(setup.captureCharFrame()).toContain("F1 Help");
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("composer arrows browse sent messages and commands, then restore the unsent draft", async () => {
+  const setup = await renderApp({});
+  try {
+    await setup.mockInput.typeText("first message");
+    setup.mockInput.pressEnter();
+    await setup.mockInput.typeText("/tui:sidebar");
+    setup.mockInput.pressEnter();
+    expect(setup.storage.setting("sidebar", true)).toBe(false);
+    expect(setup.controller.session.inputHistory).toEqual([
+      { text: "first message", attachments: [] },
+      { text: "/tui:sidebar", attachments: [] },
+    ]);
+    await setup.mockInput.typeText("unfinished draft");
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("/tui:sidebar");
+    expect(setup.captureCharFrame()).not.toContain("unfinished draft");
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("first message");
+    setup.mockInput.pressArrow("down");
+    setup.mockInput.pressArrow("down");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("unfinished draft");
+    expect(setup.prompts).toEqual(["first message"]);
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("arrows navigate multiline composer text before history, including soft wraps", async () => {
+  const setup = await renderApp({});
+  try {
+    setup.controller.recordInput("recalled entry");
+    setup.resize(38, 22);
+    await setup.renderOnce();
+    await setup.mockInput.typeText("a long line that wraps around the narrow composer");
+    setup.mockInput.pressEnter({ shift: true });
+    await setup.mockInput.typeText("last line");
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("recalled entry");
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("recalled entry");
+    for (let i = 0; i < 5 && !setup.captureCharFrame().includes("recalled entry"); i++) {
+      setup.mockInput.pressArrow("up");
+      await setup.renderOnce();
+    }
+    expect(setup.captureCharFrame()).toContain("recalled entry");
+    setup.mockInput.pressArrow("down");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("last line");
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("history restores attachments, preserves edits as drafts and respects remapped or disabled arrows", async () => {
+  for (const binding of [["alt+k"], []]) {
+    const setup = await renderApp({ "composer.historyPrevious": binding });
+    try {
+      setup.controller.recordInput("with file", ["a.ts"]);
+      await setup.renderOnce();
+      setup.mockInput.pressArrow("up");
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).not.toContain("Attached: a.ts");
+      if (!binding.length) continue;
+      setup.mockInput.pressKey("k", { meta: true });
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).toContain("Attached: a.ts");
+      setup.mockInput.pressArrow("down");
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).not.toContain("Attached: a.ts");
+      setup.mockInput.pressKey("k", { meta: true });
+      await setup.mockInput.typeText(" changed");
+      setup.mockInput.pressArrow("down");
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).toContain("with file changed");
+      expect(setup.controller.session.inputHistory).toEqual([
+        { text: "with file", attachments: ["a.ts"] },
+      ]);
+    } finally {
+      await setup.cleanup();
+    }
+  }
+});
+
+test("older transcripts remain browsable and session switches restore each unsent draft", async () => {
+  const setup = await renderApp({});
+  try {
+    setup.controller.session.inputHistory = undefined;
+    addMessage(setup.controller.session, "user", "legacy prompt");
+    setup.controller.emit("change", setup.controller.snapshot());
+    await setup.renderOnce();
+    await setup.mockInput.typeText("first draft");
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toMatch(/^│ legacy prompt/m);
+    expect(setup.captureCharFrame()).not.toContain("first draft");
+
+    const first = setup.controller.session;
+    const second = newSession("copilot", setup.controller.cwd);
+    setup.controller.session = second;
+    setup.controller.emit("change", setup.controller.snapshot());
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("first draft");
+    await setup.mockInput.typeText("second draft");
+    setup.controller.session = first;
+    setup.controller.emit("change", setup.controller.snapshot());
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("first draft");
+    expect(setup.captureCharFrame()).not.toContain("second draft");
+    setup.mockInput.pressArrow("up");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toMatch(/^│ legacy prompt/m);
   } finally {
     await setup.cleanup();
   }

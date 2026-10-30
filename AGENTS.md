@@ -185,8 +185,13 @@ shortcut lists are replaced by help; contextual interaction hints remain.
 Standard ACP context and cumulative session cost appear in the sidebar when
 reported; **Show session usage** / `/tui:usage` shows a snapshot with local receipt
 time, including on narrow terminals. `app.usage` is unbound by default.
-Input history is per
-session; drafts survive session switches within the running TUI.
+Input history is per session and persists typed local commands, sent messages,
+and attachment paths separately from the transcript. Up/Down browse at the first
+and last visual composer lines; otherwise they move within multiline text.
+Returning past the newest entry restores the unsent draft, and editing a recalled
+entry does not change saved history. Older transcripts without explicit input
+history fall back to their user messages. Drafts survive session switches within
+the running TUI.
 Shift+Tab (`app.cycle-mode`) cycles agent modes; **Cycle mode** / `/tui:cycle-mode`
 provides the same action. The composer shows the confirmed mode and shortcut even
 on narrow terminals. Key repeats and presses during a pending change are ignored.

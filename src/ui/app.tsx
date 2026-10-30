@@ -4,7 +4,7 @@ import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { basename, relative } from "node:path";
 import { Controller, type Snapshot } from "../controller";
-import { changedFiles } from "../state";
+import { changedFiles, type Message } from "../state";
 import { sessionMode } from "../modes";
 import { projectFiles } from "../files";
 import { appPaths } from "../config";
@@ -61,7 +61,8 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   let editor: TextareaRenderable | undefined;
   let scroll: ScrollBoxRenderable | undefined;
   let historyIndex = -1;
-  let savedDraft = "";
+  let savedDraft = { text: "", attachments: [] as string[] };
+  let replacementText: string | undefined;
   const drafts = new Map<string, { text: string; attachments: string[] }>();
   const busy = () => ["working", "connecting", "cancelling"].includes(state.status);
   const mode = createMemo(() => sessionMode(state.session));
@@ -73,6 +74,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     }
   };
   const replaceDraft = (text: string) => {
+    replacementText = text;
     editor?.setText(text);
     editor?.gotoBufferEnd();
     setDraft(text);
@@ -81,7 +83,10 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     const previousId = state.session.id;
     if (previousId !== snapshot.session.id) {
       setNotice("");
-      drafts.set(previousId, { text: draft(), attachments: attachments() });
+      drafts.set(
+        previousId,
+        historyIndex === -1 ? { text: draft(), attachments: attachments() } : savedDraft,
+      );
       const saved = drafts.get(snapshot.session.id);
       replaceDraft(saved?.text ?? "");
       setAttachments(saved?.attachments ?? []);
@@ -130,6 +135,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         id: path,
         label: path,
         run: () => {
+          historyIndex = -1;
           setAttachments(previous => [...new Set([...previous, path])]);
           if (draft() === "@") replaceDraft("");
         },
@@ -223,7 +229,14 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         },
       },
       { id: "files", label: "Attach file", run: showFiles },
-      { id: "clear-attachments", label: "Clear attachments", run: () => setAttachments([]) },
+      {
+        id: "clear-attachments",
+        label: "Clear attachments",
+        run: () => {
+          historyIndex = -1;
+          setAttachments([]);
+        },
+      },
       {
         id: "reconnect",
         label: "Reconnect current session",
@@ -296,7 +309,9 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         );
         return;
       }
+      controller.recordInput(text);
       replaceDraft("");
+      historyIndex = -1;
       run(command.run);
       return;
     }
@@ -407,20 +422,27 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       keys.matches("composer.historyPrevious", key) ||
       keys.matches("composer.historyNext", key)
     ) {
+      const previous = keys.matches("composer.historyPrevious", key);
+      // Let the textarea move through both hard and soft-wrapped lines first.
+      const cursor = editor?.visualCursor;
+      const view = editor?.editorView;
+      const visualRow = cursor && view ? cursor.visualRow + view.getViewport().offsetY : 0;
+      const lastRow = (view?.getTotalVirtualLineCount() ?? 1) - 1;
+      if (previous ? visualRow > 0 : visualRow < lastRow) return;
+      const history =
+        state.session.inputHistory ??
+        state.session.items
+          .filter((item): item is Message => item.type === "message" && item.role === "user")
+          .map(item => ({ text: item.text, attachments: [] as string[] }));
+      const next = Math.max(-1, Math.min(history.length - 1, historyIndex + (previous ? 1 : -1)));
+      if (next === historyIndex) return;
       if (!consumeKey(key, true)) return;
-      const history = state.session.items
-        .filter(item => item.type === "message" && item.role === "user")
-        .map(item => (item.type === "message" ? item.text : ""))
-        .reverse();
-      if (historyIndex === -1) savedDraft = editor?.plainText ?? draft();
-      historyIndex = Math.max(
-        -1,
-        Math.min(
-          history.length - 1,
-          historyIndex + (keys.matches("composer.historyPrevious", key) ? 1 : -1),
-        ),
-      );
-      replaceDraft(historyIndex === -1 ? savedDraft : (history[historyIndex] ?? ""));
+      if (historyIndex === -1)
+        savedDraft = { text: editor?.plainText ?? draft(), attachments: attachments() };
+      historyIndex = next;
+      const entry = next === -1 ? savedDraft : history[history.length - 1 - next]!;
+      replaceDraft(entry.text);
+      setAttachments([...entry.attachments]);
       return;
     }
     suppressEditorFallback(key);
@@ -647,7 +669,14 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
               : `Ask anything · / commands · @ then ${hint("composer.complete", "to attach a file")}`
           }
           {...editorColors(theme())}
-          onContentChange={() => setDraft(editor?.plainText ?? "")}
+          onContentChange={() => {
+            const text = editor?.plainText ?? "";
+            setDraft(text);
+            if (text !== replacementText) {
+              replacementText = undefined;
+              if (historyIndex !== -1) historyIndex = -1;
+            }
+          }}
         />
         <Show when={completions().length}>
           <text {...selectionColors(theme())} fg={theme().muted} maxHeight={1}>

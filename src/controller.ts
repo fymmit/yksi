@@ -80,7 +80,8 @@ export class Controller extends EventEmitter {
       }, 500);
   }
   private persist() {
-    if (this.session.remoteId || this.session.items.length) this.storage.save(this.session);
+    if (this.session.remoteId || this.session.items.length || this.session.inputHistory?.length)
+      this.storage.save(this.session);
   }
   report(error: unknown) {
     this.error = error instanceof Error ? error.message : String(error);
@@ -88,6 +89,15 @@ export class Controller extends EventEmitter {
   }
   clearError() {
     this.error = undefined;
+    this.publish(true);
+  }
+  recordInput(text: string, attachments: string[] = []) {
+    this.session.inputHistory ??= this.session.items.flatMap(item =>
+      item.type === "message" && item.role === "user" ? [{ text: item.text, attachments: [] }] : [],
+    );
+    this.session.inputHistory.push({ text, attachments: [...attachments] });
+    this.session.updatedAt = Date.now();
+    this.persist();
     this.publish(true);
   }
 
@@ -366,6 +376,7 @@ export class Controller extends EventEmitter {
       if (generation !== this.generation || this.closed || this.status !== "working") return;
       if (!session.items.some(i => i.type === "message" && i.role === "user"))
         session.title = text.trim().split("\n")[0]?.slice(0, 70) || "File discussion";
+      this.recordInput(text, attachments);
       addMessage(
         session,
         "user",
