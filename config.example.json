@@ -1,0 +1,10 @@
+{
+  "defaultAgent": "copilot",
+  "agents": {
+    "copilot": {
+      "command": "copilot",
+      "args": ["--acp", "--stdio"],
+      "env": {}
+    }
+  }
+}

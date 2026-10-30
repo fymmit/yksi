@@ -1,0 +1,64 @@
+#!/usr/bin/env bun
+import { parseArgs } from "node:util";
+import { resolve, join } from "node:path";
+import { realpath, stat } from "node:fs/promises";
+import { createCliRenderer } from "@opentui/core";
+import { render } from "@opentui/solid";
+import { appPaths, demoAgent, loadConfig } from "./config";
+import { Storage } from "./storage";
+import { Controller } from "./controller";
+import { App } from "./ui/app";
+
+async function main() {
+  const { values, positionals } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: {
+    help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" },
+    demo: { type: "boolean" }, agent: { type: "string", short: "a" }, config: { type: "string" }, cwd: { type: "string" },
+  } });
+  if (values.help) {
+    console.log(`ACP TUI — a terminal client for coding agents
+
+Usage: bun run start [directory] [options]
+
+  --agent, -a NAME  Select a configured ACP agent (default: copilot)
+  --demo           Use the offline demonstration agent
+  --config PATH    Read an explicit configuration file
+  --cwd PATH       Set the project directory
+  --help, -h       Show this help
+  --version, -v    Show version
+
+Configuration: ${appPaths().config}
+Data:          ${appPaths().data}
+
+Copilot: install Copilot CLI and sign in using its CLI before connecting.
+Keyboard: Ctrl+P commands · Ctrl+S sessions · Ctrl+A agents · Esc cancel`);
+    return;
+  }
+  if (values.version) { console.log("0.1.0"); return; }
+  if (positionals.length > 1) throw new Error("Expected at most one project directory.");
+  if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error("ACP TUI requires an interactive terminal. Use --help for usage.");
+  const cwd = await realpath(resolve(values.cwd ?? positionals[0] ?? process.cwd()));
+  if (!(await stat(cwd)).isDirectory()) throw new Error(`Not a directory: ${cwd}`);
+  const config = await loadConfig(values.config, !!values.config);
+  if (values.demo) config.agents.demo = demoAgent();
+  const agent = values.demo ? "demo" : values.agent ?? config.defaultAgent;
+  if (!config.agents[agent]) throw new Error(`Unknown agent: ${agent}. Configure it in ${values.config ?? appPaths().config}`);
+  const storage = new Storage(join(appPaths().data, "history.sqlite"));
+  const controller = new Controller(config, storage, cwd, agent, join(appPaths().data, "agent.log"));
+  const renderer = await createCliRenderer({ exitOnCtrlC: false, targetFps: 30, useMouse: true, screenMode: "alternate-screen" });
+  let quitting = false;
+  const quit = () => {
+    if (quitting) return;
+    quitting = true;
+    controller.dispose(); storage.close(); renderer.destroy();
+  };
+  process.once("SIGTERM", quit);
+  process.once("SIGINT", quit);
+  try {
+    await render(() => <App controller={controller} quit={quit} />, renderer);
+    await renderer.closed;
+  } finally {
+    quit(); process.off("SIGTERM", quit); process.off("SIGINT", quit);
+  }
+}
+
+main().catch(error => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
