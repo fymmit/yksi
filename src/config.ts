@@ -25,9 +25,8 @@ export type Config = z.infer<typeof configSchema>;
 
 export function appPaths(env = process.env) {
   return {
-    config: join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "acp-tui", "config.json"),
-    data:
-      env.ACP_TUI_DATA_DIR || join(env.XDG_DATA_HOME || join(homedir(), ".local/share"), "acp-tui"),
+    config: join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "yksi", "config.json"),
+    data: env.YKSI_DATA_DIR || join(env.XDG_DATA_HOME || join(homedir(), ".local/share"), "yksi"),
   };
 }
 

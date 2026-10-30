@@ -75,7 +75,7 @@ export class AgentClient {
       Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
     );
     this.connection = acp
-      .client({ name: "acp-tui" })
+      .client({ name: "yksi" })
       .onNotification(acp.methods.client.session.update, ctx => this.events.update(ctx.params))
       .onNotification(acp.methods.client.elicitation.complete, ctx =>
         this.events.elicitationComplete?.(ctx.params.elicitationId),
@@ -100,7 +100,7 @@ export class AgentClient {
     this.info = await this.withTimeout(
       this.agent.request(acp.methods.agent.initialize, {
         protocolVersion: acp.PROTOCOL_VERSION,
-        clientInfo: { name: "acp-tui", version: "0.1.0" },
+        clientInfo: { name: "yksi", version: "0.1.0" },
         clientCapabilities: {
           fs: { readTextFile: true, writeTextFile: true },
           terminal: true,

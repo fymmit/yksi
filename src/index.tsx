@@ -24,9 +24,9 @@ async function main() {
     },
   });
   if (values.help) {
-    console.log(`ACP TUI — a terminal client for coding agents
+    console.log(`yksi — an agent-agnostic AI coding TUI
 
-Usage: bun run start [directory] [options]
+Usage: yksi [directory] [options]
 
   --agent, -a NAME  Select a configured ACP agent (default: copilot)
   --demo           Use the offline demonstration agent
@@ -49,7 +49,7 @@ Customize shortcuts with keybindings in your configuration file.`);
   }
   if (positionals.length > 1) throw new Error("Expected at most one project directory.");
   if (!process.stdin.isTTY || !process.stdout.isTTY)
-    throw new Error("ACP TUI requires an interactive terminal. Use --help for usage.");
+    throw new Error("yksi requires an interactive terminal. Use --help for usage.");
   const cwd = await realpath(resolve(values.cwd ?? positionals[0] ?? process.cwd()));
   if (!(await stat(cwd)).isDirectory()) throw new Error(`Not a directory: ${cwd}`);
   const config = await loadConfig(values.config, !!values.config);

@@ -44,7 +44,7 @@ test("stdio handshake, command discovery, permission, streamed tool output and p
       controller.session.items.some(item => item.type === "tool" && item.status === "completed"),
     ).toBe(true);
     const last = controller.session.items.at(-1);
-    expect(last?.type === "message" && last.text.includes("Welcome to ACP TUI")).toBe(true);
+    expect(last?.type === "message" && last.text.includes("Welcome to yksi")).toBe(true);
     expect(controller.storage.list(controller.cwd)[0]?.items).toEqual(controller.session.items);
     await controller.setMode("plan");
     expect(controller.session.modes?.currentModeId).toBe("plan");

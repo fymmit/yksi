@@ -436,7 +436,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         flexDirection="row"
       >
         <text {...selectionColors(theme())} fg={theme().accent}>
-          ACP TUI / {basename(state.session.cwd)}
+          yksi / {basename(state.session.cwd)}
         </text>
         <text {...selectionColors(theme())} fg={theme().text}>
           {state.session.title}

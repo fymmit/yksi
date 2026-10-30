@@ -103,7 +103,7 @@ test("theme picker applies custom UI, syntax, Markdown and diff colors to existi
       () => hasColor(setup, "Theme heading", "#12abcd") && hasColor(setup, "const", "#ab12cd"),
     );
     expect(storage.setting("theme", "dark")).toBe("custom");
-    expect(hasColor(setup, "ACP TUI", "#aabbcc")).toBe(true);
+    expect(hasColor(setup, "yksi", "#aabbcc")).toBe(true);
     expect(hasColor(setup, "keep this draft", "#abcdef")).toBe(true);
     expect(hasColor(setup, "keep this draft", "#202122", "bg")).toBe(true);
     expect(hasColor(setup, "42", "#cd12ab")).toBe(true);
@@ -187,14 +187,14 @@ test("slash picker stays local, help preserves filtering, and persisted themes s
     await setup.renderOnce();
     expect(controller.session.items).toHaveLength(0);
     expect(storage.setting("theme", "dark")).toBe("gruvbox-light");
-    expect(hasColor(setup, "ACP TUI", themePresets["gruvbox-light"].theme.accent)).toBe(true);
+    expect(hasColor(setup, "yksi", themePresets["gruvbox-light"].theme.accent)).toBe(true);
     await setup.dispose();
     setup = await testRender(
       () => <App controller={controller} quit={() => {}} autoConnect={false} />,
       { width: 65, height: 28, kittyKeyboard: true },
     );
     await setup.renderOnce();
-    expect(hasColor(setup, "ACP TUI", themePresets["gruvbox-light"].theme.accent)).toBe(true);
+    expect(hasColor(setup, "yksi", themePresets["gruvbox-light"].theme.accent)).toBe(true);
     await setup.dispose();
     controller.config.theme = "github-dark";
     setup = await testRender(
@@ -202,7 +202,7 @@ test("slash picker stays local, help preserves filtering, and persisted themes s
       { width: 65, height: 28, kittyKeyboard: true },
     );
     await setup.renderOnce();
-    expect(hasColor(setup, "ACP TUI", themePresets["github-dark"].theme.accent)).toBe(true);
+    expect(hasColor(setup, "yksi", themePresets["github-dark"].theme.accent)).toBe(true);
     expect(storage.setting("theme", "dark")).toBe("gruvbox-light");
   } finally {
     controller.dispose();

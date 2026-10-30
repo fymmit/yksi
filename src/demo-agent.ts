@@ -29,7 +29,7 @@ const options = (mode: string): acp.SessionConfigOption[] => [
   },
 ];
 const app = acp
-  .agent({ name: "acp-tui-demo" })
+  .agent({ name: "yksi-demo" })
   .onRequest("initialize", () => ({
     protocolVersion: acp.PROTOCOL_VERSION,
     agentInfo: { name: "Demo", version: "0.1.0" },
@@ -202,7 +202,7 @@ const app = acp
     const response =
       text === "/slow"
         ? "Streaming a longer response so you can try cancelling the turn. ".repeat(80)
-        : '## Welcome to ACP TUI\n\nThis is a real ACP connection to an **offline demo agent**. No files were changed.\n\n- Open the command palette to discover actions and your configured shortcuts.\n- Use **Expand / collapse tool details** to inspect output and diffs.\n- Try `/question` for structured input or `/slow` to test cancellation.\n- Use **Switch agent** to select Copilot when you\'re ready to code.\n\n```typescript\nconst greeting = "Hello, ACP!";\nconsole.log(greeting);\n```\n';
+        : '## Welcome to yksi\n\nThis is a real ACP connection to an **offline demo agent**. No files were changed.\n\n- Open the command palette to discover actions and your configured shortcuts.\n- Use **Expand / collapse tool details** to inspect output and diffs.\n- Try `/question` for structured input or `/slow` to test cancellation.\n- Use **Switch agent** to select Copilot when you\'re ready to code.\n\n```typescript\nconst greeting = "Hello, ACP!";\nconsole.log(greeting);\n```\n';
     for (const chunk of response.match(/.{1,18}|\n/g) ?? []) {
       if (session.cancelled) return { stopReason: "cancelled" };
       await update({

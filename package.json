@@ -1,11 +1,11 @@
 {
-  "name": "acp-tui",
+  "name": "yksi",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A keyboard-first terminal client for ACP coding agents",
+  "description": "An agent-agnostic AI coding TUI",
   "bin": {
-    "acp-tui": "bin/acp-tui.ts"
+    "yksi": "bin/yksi.ts"
   },
   "scripts": {
     "start": "bun src/index.tsx",

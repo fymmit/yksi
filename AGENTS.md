@@ -1,9 +1,9 @@
-# ACP TUI — repository guide
+# yksi — repository guide
 
 ## Purpose
 
-A general, keyboard-first terminal client for AI coding agents using the **Agent
-Client Protocol (ACP)**. The desired UX follows OpenCode's interaction flow
+yksi (Finnish for "one") is an agent-agnostic, keyboard-first terminal client for
+AI coding agents using the **Agent Client Protocol (ACP)**. The desired UX follows OpenCode's interaction flow
 (conversation, composer, palette, sessions, tool details and permissions), with
 its own visual design. Copilot CLI is the first real integration. Agent behavior
 belongs to the external ACP process; this application owns the user interface
@@ -63,7 +63,7 @@ from other directories. Bundles require the preload too (see README).
   fallback for other arrays and unsupported widget types.
 - `src/demo-agent.ts`: real stdio ACP demo; simulated edits, no model service.
 - `tests/fixtures/agent.ts`: deterministic protocol fixture for lifecycle tests.
-- `bin/acp-tui.ts`, `scripts/build.ts`: launcher and bundle build.
+- `bin/yksi.ts`, `scripts/build.ts`: launcher and bundle build.
 
 ## Conventions and invariants
 

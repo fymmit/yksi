@@ -1,8 +1,10 @@
-# ACP TUI
+# yksi
 
-A keyboard-first terminal interface for AI coding agents. Connect Copilot CLI or
-another [ACP](https://agentclientprotocol.com/) agent and use a consistent
-conversation, command palette, session history, and coding workflow.
+(IPA: /ˈyksi/)
+
+An agent-agnostic AI coding TUI.
+Connect Copilot CLI, OpenCode or another [ACP](https://agentclientprotocol.com/) agent for a
+consistent conversation, command palette, session history, and coding workflow.
 
 Built with TypeScript, Bun, Solid and OpenTUI. Inspired by OpenCode's interaction
 flow.
@@ -32,15 +34,15 @@ The client launches `copilot --acp --stdio`. No configuration is needed for this
 default. Copilot retains responsibility for its models, tools, authentication,
 agent instructions, and MCP integrations.
 
-To make the launcher available as `acp-tui` while working on this checkout:
+To make the launcher available as `yksi` while working on this checkout:
 
 ```sh
 bun link
-acp-tui /path/to/project
-acp-tui --demo
+yksi /path/to/project
+yksi --demo
 ```
 
-You can also run `bun /absolute/path/to/acp-tui/bin/acp-tui.ts` from any directory.
+You can also run `bun /absolute/path/to/yksi/bin/yksi.ts` from any directory.
 
 ## Features
 
@@ -197,8 +199,8 @@ link to open in your browser.
 
 ## Agent configuration
 
-Create `~/.config/acp-tui/config.json` (or
-`$XDG_CONFIG_HOME/acp-tui/config.json`):
+Create `~/.config/yksi/config.json` (or
+`$XDG_CONFIG_HOME/yksi/config.json`):
 
 ```json
 {
@@ -224,9 +226,9 @@ environment; `env` adds or overrides individual values. Configuration is read at
 startup. Project-local configuration is not loaded implicitly.
 
 ```sh
-acp-tui --agent other
-acp-tui --config /path/to/config.json --cwd /path/to/project
-acp-tui --help
+yksi --agent other
+yksi --config /path/to/config.json --cwd /path/to/project
+yksi --help
 ```
 
 See [`config.example.json`](config.example.json). Agents execute with your normal
@@ -246,7 +248,7 @@ to `alt+t` in `keybindings`.
 
 | Family      | Preset IDs                                                                          |
 | ----------- | ----------------------------------------------------------------------------------- |
-| ACP TUI     | `dark`, `light`                                                                     |
+| yksi        | `dark`, `light`                                                                     |
 | Gruvbox     | `gruvbox-dark`, `gruvbox-light`                                                     |
 | Catppuccin  | `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha` |
 | GitHub      | `github-dark`, `github-light`                                                       |
@@ -426,12 +428,12 @@ events so holding a key cannot confirm multiple answers. Navigation can repeat.
 
 ## History and data
 
-Stored under `~/.local/share/acp-tui/` (or `$XDG_DATA_HOME/acp-tui/`):
+Stored under `~/.local/share/yksi/` (or `$XDG_DATA_HOME/yksi/`):
 
 - `history.sqlite`: transcripts, remote session IDs, retained terminal output, per-agent model selections and UI preferences.
 - `agent.log`: agent stderr, kept out of the terminal interface.
 
-Set `ACP_TUI_DATA_DIR` to use a separate data directory, e.g. for a demo. Local
+Set `YKSI_DATA_DIR` to use a separate data directory, e.g. for a demo. Local
 history is scoped to the canonical project directory and shows up to 100 recent
 sessions. The timeline initially renders the latest 200 entries; **Show earlier
 messages** loads more. History and logs may contain the content of your coding
