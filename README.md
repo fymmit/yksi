@@ -70,6 +70,7 @@ change them.
 | Ctrl+S | Project session history |
 | Ctrl+A | Choose an agent, opening a new session |
 | Ctrl+M | Advertised model, mode and agent settings |
+| Shift+Tab | Cycle through advertised agent modes |
 | Ctrl+F | Attach a text file |
 | Tab after `/…` | Complete a slash command |
 | Tab after `@` | Open the file picker |
@@ -88,6 +89,16 @@ not distinguishable in your terminal, use Alt+Enter.
 You can compose the next prompt while an agent works; submit after the turn
 finishes. Cancellation waits up to five seconds, then disconnects an unresponsive
 agent. A second Escape during cancellation disconnects immediately.
+
+**Shift+Tab** cycles modes while the session is idle, wrapping to the first choice.
+The active mode and shortcut appear beside the composer, including on narrow
+terminals. The same action is available as **Cycle mode** in the command palette
+or `/tui:cycle-mode`. Rebind or disable it with `app.cycle-mode`.
+Mode cycling uses the first ACP config option categorized as `mode` (including
+grouped choices or a boolean toggle), or the older session modes API when the
+agent provides no config options. Uncategorized settings remain available through
+Ctrl+M. Repeated key events and additional presses while a setting change is
+pending are ignored; the displayed mode follows agent-confirmed state.
 
 ### Commands and attachments
 
@@ -238,6 +249,7 @@ Application actions are active with the composer, except where noted:
 | `app.sessions` | `ctrl+s` | Switch session |
 | `app.agents` | `ctrl+a` | Switch agent |
 | `app.config` | `ctrl+m` | Agent model/mode/settings |
+| `app.cycle-mode` | `shift+tab` | Cycle advertised agent modes |
 | `app.files` | `ctrl+f` | Attach file |
 | `app.sidebar` | `ctrl+b` | Toggle sidebar |
 | `app.tools` | `ctrl+o` | Toggle tool details; active everywhere |

@@ -13,6 +13,7 @@ export const keyActions = {
   "app.agents": action(["composer"], "ctrl+a"),
   "app.new": action(["composer"], "ctrl+n"),
   "app.config": action(["composer"], "ctrl+m"),
+  "app.cycle-mode": action(["composer"], "shift+tab"),
   "app.files": action(["composer"], "ctrl+f"),
   "app.sidebar": action(["composer"], "ctrl+b"),
   "app.tools": action(all, "ctrl+o"),

@@ -2,24 +2,41 @@ import * as acp from "@agentclientprotocol/sdk";
 import { Readable, Writable } from "node:stream";
 
 // A real stdio ACP agent for offline exploration and protocol integration tests.
-const sessions = new Map<string, { history: acp.SessionUpdate[]; cancelled: boolean; cwd: string }>();
-const options: acp.SessionConfigOption[] = [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "demo", options: [{ value: "demo", name: "Offline demo" }] }];
+const sessions = new Map<string, { history: acp.SessionUpdate[]; cancelled: boolean; cwd: string; mode: string }>();
+const modes = [{ id: "code", name: "Code" }, { id: "plan", name: "Plan" }];
+const options = (mode: string): acp.SessionConfigOption[] => [
+  { id: "model", name: "Model", category: "model", type: "select", currentValue: "demo", options: [{ value: "demo", name: "Offline demo" }] },
+  { id: "mode", name: "Mode", category: "mode", type: "select", currentValue: mode, options: modes.map(mode => ({ value: mode.id, name: mode.name })) },
+];
 const app = acp.agent({ name: "acp-tui-demo" })
   .onRequest("initialize", () => ({ protocolVersion: acp.PROTOCOL_VERSION, agentInfo: { name: "Demo", version: "0.1.0" }, agentCapabilities: { loadSession: true, promptCapabilities: { embeddedContext: true } }, authMethods: [] }))
   .onRequest("session/new", async ctx => {
     const sessionId = crypto.randomUUID();
-    sessions.set(sessionId, { history: [], cancelled: false, cwd: ctx.params.cwd });
+    sessions.set(sessionId, { history: [], cancelled: false, cwd: ctx.params.cwd, mode: "code" });
     await ctx.client.notify("session/update", { sessionId, update: { sessionUpdate: "available_commands_update", availableCommands: [{ name: "help", description: "Explore the demo agent" }, { name: "question", description: "Try a structured question" }, { name: "slow", description: "Try cancelling a long response" }] } });
-    return { sessionId, configOptions: options, modes: { currentModeId: "code", availableModes: [{ id: "code", name: "Code" }, { id: "plan", name: "Plan" }] } };
+    return { sessionId, configOptions: options("code"), modes: { currentModeId: "code", availableModes: modes } };
   })
   .onRequest("session/load", async ctx => {
     const session = sessions.get(ctx.params.sessionId);
     if (!session) throw new acp.RequestError(-32001, "Demo sessions last only for the lifetime of the demo process. Local history is still available.");
     for (const update of session.history) await ctx.client.notify("session/update", { sessionId: ctx.params.sessionId, update });
-    return { configOptions: options };
+    return { configOptions: options(session.mode), modes: { currentModeId: session.mode, availableModes: modes } };
   })
-  .onRequest("session/set_mode", () => ({}))
-  .onRequest("session/set_config_option", () => ({ configOptions: options }))
+  .onRequest("session/set_mode", async ctx => {
+    if (!modes.some(mode => mode.id === ctx.params.modeId)) throw new Error("Unknown demo mode");
+    sessions.get(ctx.params.sessionId)!.mode = ctx.params.modeId;
+    await ctx.client.notify("session/update", { sessionId: ctx.params.sessionId, update: { sessionUpdate: "config_option_update", configOptions: options(ctx.params.modeId) } });
+    return {};
+  })
+  .onRequest("session/set_config_option", async ctx => {
+    const session = sessions.get(ctx.params.sessionId)!;
+    if (ctx.params.configId === "mode") {
+      if (typeof ctx.params.value !== "string" || !modes.some(mode => mode.id === ctx.params.value)) throw new Error("Unknown demo mode");
+      session.mode = ctx.params.value;
+      await ctx.client.notify("session/update", { sessionId: ctx.params.sessionId, update: { sessionUpdate: "current_mode_update", currentModeId: session.mode } });
+    }
+    return { configOptions: options(session.mode) };
+  })
   .onNotification("session/cancel", ctx => { const session = sessions.get(ctx.params.sessionId); if (session) session.cancelled = true; })
   .onRequest("session/prompt", async ctx => {
     const { sessionId } = ctx.params;

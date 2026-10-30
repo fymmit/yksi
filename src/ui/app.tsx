@@ -5,6 +5,7 @@ import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { basename, relative } from "node:path";
 import { Controller, type Snapshot } from "../controller";
 import { changedFiles } from "../state";
+import { sessionMode } from "../modes";
 import { projectFiles } from "../files";
 import { appPaths } from "../config";
 import { resolveKeybindings, type KeyAction } from "../keybindings";
@@ -40,6 +41,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   let savedDraft = "";
   const drafts = new Map<string, { text: string; attachments: string[] }>();
   const busy = () => ["working", "connecting", "cancelling"].includes(state.status);
+  const mode = createMemo(() => sessionMode(state.session));
   const run = (action: () => unknown) => {
     try { void Promise.resolve(action()).catch(error => controller.report(error)); } catch (error) { controller.report(error); }
   };
@@ -79,7 +81,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       const values = option.options.flatMap(value => "options" in value ? value.options : [value]);
       setPalette({ title: option.name, choices: values.map(value => ({ id: value.value, label: value.name, detail: value.description ?? undefined, run: () => controller.setConfig(option.id, value.value) })) });
     } })),
-    ...(state.session.modes?.availableModes ?? []).map(mode => ({ id: `mode:${mode.id}`, label: `Mode: ${mode.name}`, detail: mode.description ?? undefined, run: () => controller.setMode(mode.id) })),
+    ...(state.session.configOptions.length ? [] : state.session.modes?.availableModes ?? []).map(mode => ({ id: `mode:${mode.id}`, label: `Mode: ${mode.name}`, detail: mode.description ?? undefined, run: () => controller.setMode(mode.id) })),
   ] });
   const toggleSidebar = () => { setSidebar(value => !value); controller.storage.setSetting("sidebar", sidebar()); };
   const toggleTheme = () => { setThemeName(name => name === "dark" ? "light" : "dark"); controller.storage.setSetting("theme", themeName()); };
@@ -88,6 +90,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     { id: "sessions", label: "Switch session", run: showSessions },
     { id: "agents", label: "Switch agent", run: showAgents },
     { id: "config", label: "Model, mode and agent settings", detail: "advertised by the agent", run: showConfig },
+    { id: "cycle-mode", label: "Cycle mode", detail: "next agent mode", run: () => controller.cycleMode() },
     { id: "usage", label: "Show session usage", detail: "last reported cost and context", run: () => { controller.clearError(); setNotice(usageSummary(state.session)); } },
     { id: "files", label: "Attach file", run: showFiles },
     { id: "clear-attachments", label: "Clear attachments", run: () => setAttachments([]) },
@@ -202,7 +205,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           <text fg={theme().accent}>{state.session.title}</text>
           <text fg={theme().muted}>{state.session.agent}</text>
           <For each={state.session.configOptions}>{option => <text fg={theme().muted}>{option.name}: {String(option.currentValue)}</text>}</For>
-          <Show when={state.session.modes}><text fg={theme().muted}>Mode: {state.session.modes?.currentModeId}</text></Show>
+          <Show when={!state.session.configOptions.length && state.session.modes}><text fg={theme().muted}>Mode: {state.session.modes?.currentModeId}</text></Show>
           <Show when={state.session.usage}><text fg={theme().muted}>Context: {state.session.usage?.used.toLocaleString()} / {state.session.usage?.size.toLocaleString()}</text></Show>
           <Show when={state.session.usage}><text fg={theme().muted}>Reported cost:{"\n"}{formatCost(state.session.usage?.cost)}</text></Show>
           <Show when={state.session.plan.length}><text fg={theme().accent} marginTop={1}>Plan</text></Show>
@@ -217,6 +220,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     <Show when={palette()} keyed>{menu => <Picker title={menu.title} choices={menu.choices} theme={theme()} keys={keys} height={dimensions().height} close={() => setPalette(undefined)} error={error => controller.report(error)} />}</Show>
     <Show when={state.interaction} keyed>{interaction => <InteractionView interaction={interaction} theme={theme()} keys={keys} answer={(id, content) => controller.answer(id, content)} />}</Show>
     <box border borderColor={busy() ? theme().accent : theme().border} backgroundColor={theme().panel} flexDirection="column" paddingX={1} flexShrink={0}>
+      <Show when={mode()}>{current => <text fg={theme().accent} maxHeight={1}>{current().name}: {current().options.find(option => option.value === current().currentValue)?.name ?? String(current().currentValue)}{current().options.length > 1 ? ` · ${hint("app.cycle-mode", "cycle mode")}` : ""}</text>}</Show>
       <Show when={attachments().length}><text fg={theme().accent} maxHeight={2}>Attached: {attachments().join(", ")}</text></Show>
       <textarea ref={editor} focused={!palette() && !state.interaction} height={Math.min(5, Math.max(2, draft().split("\n").length))} placeholder={busy() ? "Compose your next message…" : `Ask anything · / commands · @ then ${hint("composer.complete", "to attach a file")}`} textColor={theme().text} focusedTextColor={theme().text} backgroundColor={theme().panel} focusedBackgroundColor={theme().panel} cursorColor={theme().accent} onContentChange={() => setDraft(editor?.plainText ?? "")} />
       <Show when={completions().length}><text fg={theme().muted} maxHeight={1}>{completions().join("  ")} · {hint("composer.complete", "complete")}</text></Show>

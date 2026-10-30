@@ -37,6 +37,8 @@ from other directories. Bundles require the preload too (see README).
 - `src/config.ts`: validated global agent definitions, XDG paths, demo launch.
 - `src/keybindings.ts`: typed action/default/context registry, validated global
   overrides, exact key matching, and shortcut labels.
+- `src/modes.ts`: semantic mode selection, preferring categorized config options
+  over the legacy session modes API.
 - `src/acp/client.ts`: SDK fluent client, stdio, capabilities, stderr and timeouts.
 - `src/acp/files.ts`, `src/acp/terminals.ts`: ACP client resource methods.
 - `src/controller.ts`: connection/session lifecycle, permission and question
@@ -79,6 +81,10 @@ from other directories. Bundles require the preload too (see README).
   resend a prompt after disconnect.
 - Only one active agent connection/turn is supported. Generation checks keep
   stale async operations from modifying a replacement session.
+- Mode cycling uses the first `category: "mode"` config option and agent-provided
+  choice order (flattening groups), or toggles a boolean mode. Legacy modes are
+  used only without config options. Setting changes require an idle session,
+  serialize requests, and discard stale results/errors after session replacement.
 - Resolve pending interaction promises on cancellation/disconnect. An agent's
   permission option IDs and scope labels are authoritative.
 - ACP paths are absolute, line numbers 1-based. Filesystem and command execution
@@ -113,6 +119,9 @@ reported; **Show session usage** / `/tui:usage` shows a snapshot with local rece
 time, including on narrow terminals. `app.usage` is unbound by default.
 Input history is per
 session; drafts survive session switches within the running TUI.
+Shift+Tab (`app.cycle-mode`) cycles agent modes; **Cycle mode** / `/tui:cycle-mode`
+provides the same action. The composer shows the confirmed mode and shortcut even
+on narrow terminals. Key repeats and presses during a pending change are ignored.
 Forms show one question at a time: Up/Down highlights boolean/enum options,
 Enter confirms and advances, Left/Right revisits questions with drafts retained.
 Text/number answers also use Enter; text uses Shift/Alt+Enter for newlines and

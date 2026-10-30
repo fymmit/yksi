@@ -25,6 +25,121 @@ async function renderApp(keybindings: KeyOverrides) {
     async cleanup() { controller.dispose(); await setup.dispose(); storage.close(); } };
 }
 
+function installModes(controller: Controller) {
+  const changes: string[] = [];
+  controller.session.modes = { currentModeId: "ask", availableModes: [{ id: "ask", name: "Ask" }, { id: "plan", name: "Plan" }] };
+  controller.setMode = async mode => {
+    changes.push(mode);
+    controller.session.modes!.currentModeId = mode;
+    controller.emit("change", controller.snapshot());
+  };
+  controller.emit("change", controller.snapshot());
+  return changes;
+}
+
+test("Shift+Tab cycles modes without changing drafts, ignores repeat/release events, and shows narrow-terminal feedback", async () => {
+  const setup = await renderApp({});
+  const changes = installModes(setup.controller);
+  try {
+    setup.resize(60, 20);
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Mode: Ask · Shift+Tab cycle mode");
+    await setup.mockInput.typeText("keep draft");
+    setup.mockInput.pressKey("TAB");
+    setup.mockInput.pressKey("TAB", { ctrl: true, shift: true });
+    expect(changes).toEqual([]);
+    setup.mockInput.pressKey("\x1b[Z"); // Traditional terminal backtab.
+    await setup.renderOnce();
+    expect(changes).toEqual(["plan"]);
+    expect(setup.captureCharFrame()).toContain("Mode: Plan · Shift+Tab cycle mode");
+    expect(setup.captureCharFrame()).toContain("keep draft");
+    expect(setup.captureCharFrame()).not.toContain("Agent session settings");
+    setup.mockInput.pressKey("\x1b[9;2:2u");
+    setup.mockInput.pressKey("\x1b[9;2:3u");
+    await setup.renderOnce();
+    expect(changes).toEqual(["plan"]);
+    setup.mockInput.pressKey("TAB", { shift: true });
+    await setup.renderOnce();
+    expect(changes).toEqual(["plan", "ask"]);
+    setup.mockInput.pressEnter();
+    expect(setup.prompts).toEqual(["keep draft"]);
+  } finally { await setup.cleanup(); }
+});
+
+test("cycle-mode remaps and disabling retain palette access and shortcut labels", async () => {
+  for (const bindings of [["alt+m", "f2"], []]) {
+    const setup = await renderApp({ "app.cycle-mode": bindings });
+    const changes = installModes(setup.controller);
+    try {
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).toContain(bindings.length ? "Alt+M cycle mode" : "cycle mode (unbound)");
+      setup.mockInput.pressKey("TAB", { shift: true });
+      expect(changes).toEqual([]);
+      if (bindings.length) {
+        setup.mockInput.pressKey("m", { meta: true });
+        await setup.renderOnce();
+        expect(changes).toEqual(["plan"]);
+      }
+      setup.mockInput.pressKey("p", { ctrl: true });
+      await setup.mockInput.typeText("Cycle mode");
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).toContain("Cycle mode");
+      if (bindings.length) expect(setup.captureCharFrame()).toContain("Alt+M / F2");
+      setup.mockInput.pressEnter();
+      await setup.renderOnce();
+      expect(changes.length).toBe(bindings.length ? 2 : 1);
+    } finally { await setup.cleanup(); }
+  }
+});
+
+test("mode cycling is scoped to the composer and is available as a client command", async () => {
+  const setup = await renderApp({});
+  const changes = installModes(setup.controller);
+  try {
+    setup.mockInput.pressKey("p", { ctrl: true });
+    setup.mockInput.pressKey("TAB", { shift: true });
+    expect(changes).toEqual([]);
+    setup.mockInput.pressKey("ESCAPE");
+    for (const form of [undefined, { properties: { enabled: { type: "boolean" as const } } }]) {
+      setup.controller.emit("change", { ...setup.controller.snapshot(), interaction: { id: "question", title: "Confirm?", options: [{ id: "yes", name: "Yes" }], form } });
+      await setup.renderOnce();
+      setup.mockInput.pressKey("TAB", { shift: true });
+      expect(changes).toEqual([]);
+    }
+    setup.controller.emit("change", setup.controller.snapshot());
+    await setup.renderOnce();
+    await setup.mockInput.typeText("/tui:cycle-mode");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
+    expect(changes).toEqual(["plan"]);
+    expect(setup.prompts).toEqual([]);
+    expect(setup.captureCharFrame()).toContain("Mode: Plan");
+  } finally { await setup.cleanup(); }
+});
+
+test("config mode feedback follows replacement snapshots and settings omit duplicate legacy modes", async () => {
+  const setup = await renderApp({});
+  try {
+    setup.controller.session.modes = { currentModeId: "legacy", availableModes: [{ id: "legacy", name: "Legacy mode" }] };
+    setup.controller.session.configOptions = [{ id: "operation", name: "Mode", category: "mode", type: "select", currentValue: "plan", options: [
+      { group: "all", name: "All", options: [{ value: "plan", name: "Plan" }, { value: "code", name: "Code" }] },
+    ] }];
+    setup.controller.emit("change", setup.controller.snapshot());
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Mode: Plan · Shift+Tab cycle mode");
+    expect(setup.captureCharFrame()).not.toContain("Mode: legacy");
+    setup.mockInput.pressKey("m", { ctrl: true });
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Agent session settings");
+    expect(setup.captureCharFrame()).not.toContain("Legacy mode");
+    setup.mockInput.pressKey("ESCAPE");
+    setup.controller.session.configOptions = [{ id: "operation", name: "Mode", category: "mode", type: "boolean", currentValue: true }];
+    setup.controller.emit("change", setup.controller.snapshot());
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Mode: On · Shift+Tab cycle mode");
+  } finally { await setup.cleanup(); }
+});
+
 test("remapped app commands update hints, consume only exact keys and keep palette actions available", async () => {
   const setup = await renderApp({ "app.commands": ["alt+p"], "app.sidebar": [], "app.theme": ["alt+t"] });
   try {

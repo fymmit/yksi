@@ -32,6 +32,9 @@ test("stdio handshake, command discovery, permission, streamed tool output and p
     expect(controller.storage.list(controller.cwd)[0]?.items).toEqual(controller.session.items);
     await controller.setMode("plan");
     expect(controller.session.modes?.currentModeId).toBe("plan");
+    await controller.cycleMode();
+    expect(controller.session.configOptions.find(option => option.category === "mode")?.currentValue).toBe("code");
+    expect(controller.session.modes?.currentModeId).toBe("code");
   } finally { dispose(); }
 }, 15_000);
 

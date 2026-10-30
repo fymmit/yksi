@@ -6,6 +6,7 @@ import type { Config } from "./config";
 import { Storage } from "./storage";
 import { addMessage, applyUpdate, newSession, type Session } from "./state";
 import { AgentClient } from "./acp/client";
+import { sessionMode } from "./modes";
 
 export type Interaction = {
   id: string;
@@ -37,6 +38,7 @@ export class Controller extends EventEmitter {
   private cancelTimer?: ReturnType<typeof setTimeout>;
   private closed = false;
   private generation = 0;
+  private settingRequest?: symbol;
 
   constructor(readonly config: Config, readonly storage: Storage, readonly cwd: string, agent: string, private logPath?: string) {
     super();
@@ -86,6 +88,7 @@ export class Controller extends EventEmitter {
     if (!definition) throw new Error(`Agent is not configured: ${saved?.agent ?? agent}`);
     this.persist(); this.client?.dispose(); this.dismissInteractions();
     const generation = ++this.generation;
+    this.settingRequest = undefined;
     this.session = saved ? structuredClone(saved) : newSession(agent, this.cwd);
     if (!this.session.remoteId) { this.session.usage = undefined; this.session.usageUpdatedAt = undefined; }
     this.session.commands = []; this.session.configOptions = []; this.session.modes = undefined;
@@ -214,18 +217,41 @@ export class Controller extends EventEmitter {
     await this.client.agent.notify(acp.methods.agent.session.cancel, { sessionId: this.session.remoteId! });
   }
   async setMode(modeId: string) {
-    if (this.status !== "ready") throw new Error("Wait for the current operation to finish.");
-    await this.client!.withTimeout(this.client!.agent.request(acp.methods.agent.session.setMode, { sessionId: this.session.remoteId!, modeId }));
-    if (this.session.modes) this.session.modes.currentModeId = modeId;
-    this.publish(true);
+    await this.changeSetting((client, session) => client.agent.request(acp.methods.agent.session.setMode, { sessionId: session.remoteId!, modeId }), (_, session) => {
+      if (session.modes) session.modes.currentModeId = modeId;
+    });
   }
   async setConfig(configId: string, value: string | boolean) {
-    if (this.status !== "ready") throw new Error("Wait for the current operation to finish.");
-    const params: acp.SetSessionConfigOptionRequest = typeof value === "boolean"
-      ? { sessionId: this.session.remoteId!, configId, type: "boolean", value }
-      : { sessionId: this.session.remoteId!, configId, value };
-    const result = await this.client!.withTimeout(this.client!.agent.request(acp.methods.agent.session.setConfigOption, params));
-    this.session.configOptions = result.configOptions; this.publish(true);
+    await this.changeSetting((client, session) => {
+      const params: acp.SetSessionConfigOptionRequest = typeof value === "boolean"
+        ? { sessionId: session.remoteId!, configId, type: "boolean", value }
+        : { sessionId: session.remoteId!, configId, value };
+      return client.agent.request(acp.methods.agent.session.setConfigOption, params);
+    }, (result, session) => { session.configOptions = result.configOptions; });
+  }
+  async cycleMode() {
+    // Ignore rapid presses until the agent confirms the previous setting change.
+    if (this.settingRequest) return;
+    const mode = sessionMode(this.session);
+    if (!mode || !mode.options.length) throw new Error("This agent does not advertise a mode selector.");
+    if (mode.options.length < 2) return;
+    const index = mode.options.findIndex(option => option.value === mode.currentValue);
+    const next = mode.options[(index + 1) % mode.options.length]!;
+    if (mode.configId !== undefined) await this.setConfig(mode.configId, next.value);
+    else await this.setMode(String(next.value));
+  }
+  private async changeSetting<T>(request: (client: AgentClient, session: Session) => Promise<T>, apply: (result: T, session: Session) => void) {
+    if (this.status !== "ready" || this.settingRequest) throw new Error("Wait for the current operation to finish.");
+    if (this.closed || !this.client || !this.session.remoteId) throw new Error("Connect to an agent before changing settings.");
+    const client = this.client, session = this.session, generation = this.generation;
+    const token = this.settingRequest = Symbol();
+    const current = () => !this.closed && generation === this.generation && this.status !== "disconnected";
+    try {
+      const result = await client.withTimeout(request(client, session));
+      if (!current()) return;
+      apply(result, session); this.publish(true);
+    } catch (error) { if (current()) throw error; }
+    finally { if (this.settingRequest === token) this.settingRequest = undefined; }
   }
   async authenticate(methodId: string) {
     if (!this.client || this.busy) throw new Error("Connect to an agent first.");
