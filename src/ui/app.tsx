@@ -160,6 +160,29 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       })),
     });
   };
+  const showConfigOption = (
+    option: Snapshot["session"]["configOptions"][number],
+    title = option.name,
+  ) => {
+    if (option.type === "boolean") return controller.setConfig(option.id, !option.currentValue);
+    const values = option.options.flatMap(value => ("options" in value ? value.options : [value]));
+    setPalette({
+      title,
+      choices: values.map(value => ({
+        id: value.value,
+        label: value.name,
+        detail: value.description ?? undefined,
+        run: () => controller.setConfig(option.id, value.value),
+      })),
+    });
+  };
+  const showModel = () => {
+    const option = state.session.configOptions.find(
+      option => option.category === "model" && option.type === "select",
+    );
+    if (option) showConfigOption(option, "Choose model");
+    else setNotice("This agent does not advertise a model selector.");
+  };
   const showConfig = () =>
     setPalette({
       title: "Agent session settings",
@@ -168,22 +191,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           id: option.id,
           label: option.name,
           detail: String(option.currentValue),
-          run: () => {
-            if (option.type === "boolean")
-              return controller.setConfig(option.id, !option.currentValue);
-            const values = option.options.flatMap(value =>
-              "options" in value ? value.options : [value],
-            );
-            setPalette({
-              title: option.name,
-              choices: values.map(value => ({
-                id: value.value,
-                label: value.name,
-                detail: value.description ?? undefined,
-                run: () => controller.setConfig(option.id, value.value),
-              })),
-            });
-          },
+          run: () => showConfigOption(option),
         })),
         ...(state.session.configOptions.length
           ? []
@@ -231,6 +239,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         detail: "advertised by the agent",
         run: showConfig,
       },
+      { id: "model", label: "Choose model", run: showModel },
       {
         id: "cycle-mode",
         label: "Cycle mode",

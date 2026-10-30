@@ -398,7 +398,8 @@ Application actions are active with the composer, except where noted:
 | `app.new`                         | `leader n`            | New session                                                                    |
 | `app.sessions`                    | `leader s`            | Switch session                                                                 |
 | `app.agents`                      | `leader a`            | Switch agent                                                                   |
-| `app.config`                      | `leader m`            | Agent model/mode/settings                                                      |
+| `app.config`                      | `leader c`            | Agent model/mode/settings                                                      |
+| `app.model`                       | `leader m`            | Choose an agent-advertised model directly                                      |
 | `app.cycle-mode`                  | `shift+tab`           | Cycle advertised agent modes                                                   |
 | `app.files`                       | `leader f`            | Attach file                                                                    |
 | `app.sidebar`                     | `leader b`            | Toggle sidebar                                                                 |

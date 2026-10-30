@@ -203,6 +203,9 @@ the running TUI.
 Shift+Tab (`app.cycle-mode`) cycles agent modes; **Cycle mode** / `/tui:cycle-mode`
 provides the same action. The composer shows the confirmed mode and shortcut even
 on narrow terminals. Key repeats and presses during a pending change are ignored.
+`leader m` (`app.model`) opens the first agent-advertised select model option
+directly; without one it reports that no model selector is available. `leader c`
+(`app.config`) opens all agent session settings, including modes and models.
 Forms show one question at a time: Up/Down highlights boolean/enum options,
 Enter confirms and advances, Left/Right revisits questions with drafts retained.
 Text/number answers also use Enter; text uses Shift/Alt+Enter for newlines and

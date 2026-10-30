@@ -21,6 +21,8 @@ test("keybindings inherit defaults, replace alternatives and disable shortcuts",
   expect(keys.hint("app.sidebar", "sidebar")).toBe("sidebar (unbound)");
   expect(keys.label("composer.submit")).toBe("Enter");
   expect(defaultKeybindings.label("app.commands")).toBe("Ctrl+X P");
+  expect(defaultKeybindings.label("app.config")).toBe("Ctrl+X C");
+  expect(defaultKeybindings.label("app.model")).toBe("Ctrl+X M");
   expect(defaultKeybindings.label("app.theme")).toBe("Ctrl+X T");
   expect(keyActions["app.commands"].keys).toEqual(["leader p"]);
   expect(defaultKeybindings.label("composer.historyPrevious")).toBe("Up / Ctrl+P");
@@ -28,8 +30,19 @@ test("keybindings inherit defaults, replace alternatives and disable shortcuts",
   expect(defaultKeybindings.sequence("composer", { name: "x", ctrl: true }, { name: "p" })).toBe(
     "app.commands",
   );
+  expect(defaultKeybindings.sequence("composer", { name: "x", ctrl: true }, { name: "c" })).toBe(
+    "app.config",
+  );
+  expect(defaultKeybindings.sequence("composer", { name: "x", ctrl: true }, { name: "m" })).toBe(
+    "app.model",
+  );
   expect(defaultKeybindings.sequence("picker", { name: "x", ctrl: true }, { name: "o" })).toBe(
     "app.tools",
+  );
+  const remapped = resolveKeybindings({ "app.model": ["alt+m"], "app.config": ["leader m"] });
+  expect(remapped.label("app.model")).toBe("Alt+M");
+  expect(remapped.sequence("composer", { name: "x", ctrl: true }, { name: "m" })).toBe(
+    "app.config",
   );
 });
 

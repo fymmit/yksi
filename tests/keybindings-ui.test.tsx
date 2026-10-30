@@ -326,7 +326,7 @@ test("config mode feedback follows replacement snapshots and settings omit dupli
     expect(setup.captureCharFrame()).toContain("Mode: Plan · Shift+Tab cycle mode");
     expect(setup.captureCharFrame()).not.toContain("Mode: legacy");
     setup.mockInput.pressKey("x", { ctrl: true });
-    setup.mockInput.pressKey("m");
+    setup.mockInput.pressKey("c");
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Agent session settings");
     expect(setup.captureCharFrame()).not.toContain("Legacy mode");
@@ -337,6 +337,80 @@ test("config mode feedback follows replacement snapshots and settings omit dupli
     setup.controller.emit("change", setup.controller.snapshot());
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Mode: On · Shift+Tab cycle mode");
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("model shortcut opens advertised model choices directly and keeps settings available", async () => {
+  const setup = await renderApp({});
+  const changes: Array<[string, string | boolean]> = [];
+  try {
+    setup.controller.session.configOptions = [
+      {
+        id: "operation",
+        name: "Mode",
+        category: "mode",
+        type: "boolean",
+        currentValue: false,
+      },
+      {
+        id: "engine",
+        name: "Model",
+        category: "model",
+        type: "select",
+        currentValue: "default",
+        options: [
+          {
+            group: "models",
+            name: "Models",
+            options: [
+              { value: "default", name: "Default" },
+              { value: "preferred", name: "Preferred" },
+            ],
+          },
+        ],
+      },
+    ];
+    setup.controller.setConfig = async (id, value) => {
+      changes.push([id, value]);
+    };
+    setup.controller.emit("change", setup.controller.snapshot());
+    await setup.renderOnce();
+    await setup.mockInput.typeText("unsent draft");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("m");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Choose model");
+    expect(setup.captureCharFrame()).toContain("Preferred");
+    expect(setup.captureCharFrame()).not.toContain("Agent session settings");
+    await setup.mockInput.typeText("Preferred");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
+    expect(changes).toEqual([["engine", "preferred"]]);
+    expect(setup.captureCharFrame()).toContain("unsent draft");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("c");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Agent session settings");
+    expect(setup.captureCharFrame()).toContain("Mode");
+  } finally {
+    await setup.cleanup();
+  }
+});
+
+test("model shortcut reports when the agent has no advertised model selector", async () => {
+  const setup = await renderApp({});
+  try {
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("m");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("This agent does not advertise a model selector.");
+    expect(setup.captureCharFrame()).not.toContain("Choose model ·");
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("c");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Agent session settings");
   } finally {
     await setup.cleanup();
   }
