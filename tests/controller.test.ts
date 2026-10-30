@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { Controller, type Snapshot } from "../src/controller";
 import { demoAgent } from "../src/config";
 import { Storage } from "../src/storage";
+import type { ClientEvents } from "../src/acp/client";
 
 function setup() {
   const storage = new Storage(":memory:");
@@ -154,5 +155,73 @@ test("cancelling initialization does not let a stale connection overwrite its re
     await opening;
     expect(controller.status).toBe("ready");
     expect(controller.error).toBeUndefined();
+  } finally { dispose(); }
+});
+
+test("ACP costs persist, replay replaces totals, and new sessions reject old connection updates", async () => {
+  const { controller, dispose } = setup();
+  controller.config.agents.demo!.args = [resolve(import.meta.dir, "fixtures/agent.ts")];
+  try {
+    await controller.open();
+    const oldEvents = Reflect.get(controller.client!, "events") as ClientEvents;
+    await controller.send("usage");
+    expect(controller.session.usage?.cost).toEqual({ amount: 0.25, currency: "USD" });
+    expect(controller.session.usageUpdatedAt).toBeGreaterThan(0);
+    const saved = controller.storage.list(controller.cwd)[0]!;
+    expect(saved.usage).toEqual(controller.session.usage);
+    expect(saved.usageUpdatedAt).toBe(controller.session.usageUpdatedAt);
+
+    await controller.open(saved);
+    expect(controller.status).toBe("ready");
+    expect(controller.session.usage?.cost?.amount).toBe(0.5);
+    expect(controller.session.usageUpdatedAt!).toBeGreaterThanOrEqual(saved.usageUpdatedAt!);
+
+    await controller.open();
+    expect(controller.session.usage).toBeUndefined();
+    oldEvents.update({ sessionId: controller.session.remoteId!, update: {
+      sessionUpdate: "usage_update", used: 1, size: 200000, cost: { amount: 999, currency: "USD" },
+    } });
+    expect(controller.session.usage).toBeUndefined();
+    expect(controller.session.usageUpdatedAt).toBeUndefined();
+
+    // A saved local record without a remote ID must also start fresh usage.
+    await controller.open({ ...saved, remoteId: undefined });
+    expect(controller.status).toBe("ready");
+    expect(controller.session.usage).toBeUndefined();
+    expect(controller.session.usageUpdatedAt).toBeUndefined();
+  } finally { dispose(); }
+});
+
+test("failed ACP replay preserves saved usage and receipt time", async () => {
+  const { controller, dispose } = setup();
+  controller.config.agents.demo!.args = [resolve(import.meta.dir, "fixtures/agent.ts")];
+  try {
+    await controller.open();
+    await controller.send("usage");
+    const saved = structuredClone(controller.session);
+    controller.config.agents.demo!.env.FAIL_LOAD = "1";
+    await controller.open(saved);
+    expect(controller.status).toBe("history");
+    expect(controller.session.items).toEqual(saved.items);
+    expect(controller.session.usage).toEqual(saved.usage);
+    expect(controller.session.usageUpdatedAt).toBe(saved.usageUpdatedAt);
+  } finally { dispose(); }
+});
+
+test("ACP resume retains the last reading until the agent reports usage again", async () => {
+  const { controller, dispose } = setup();
+  controller.config.agents.demo!.args = [resolve(import.meta.dir, "fixtures/agent.ts")];
+  controller.config.agents.demo!.env.RESUME = "1";
+  try {
+    await controller.open();
+    await controller.send("usage");
+    const saved = structuredClone(controller.session);
+    await controller.open(saved);
+    expect(controller.status).toBe("ready");
+    expect(controller.session.usage).toEqual(saved.usage);
+    expect(controller.session.usageUpdatedAt).toBe(saved.usageUpdatedAt);
+    await controller.send("usage");
+    expect(controller.session.usage?.cost?.amount).toBe(0.25);
+    expect(controller.session.usageUpdatedAt!).toBeGreaterThanOrEqual(saved.usageUpdatedAt!);
   } finally { dispose(); }
 });

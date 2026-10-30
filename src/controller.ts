@@ -87,14 +87,15 @@ export class Controller extends EventEmitter {
     this.persist(); this.client?.dispose(); this.dismissInteractions();
     const generation = ++this.generation;
     this.session = saved ? structuredClone(saved) : newSession(agent, this.cwd);
+    if (!this.session.remoteId) { this.session.usage = undefined; this.session.usageUpdatedAt = undefined; }
     this.session.commands = []; this.session.configOptions = []; this.session.modes = undefined;
     this.terminalOutput = this.session.terminalOutput ?? {}; this.status = "connecting"; this.error = undefined;
     const session = this.session;
-    let replay: acp.SessionUpdate[] | undefined;
+    let replay: { update: acp.SessionUpdate; receivedAt: number }[] | undefined;
     const client = this.client = new AgentClient(definition, session.cwd, {
       update: notification => {
         if (generation !== this.generation || (session.remoteId && notification.sessionId !== session.remoteId)) return;
-        if (replay) replay.push(notification.update);
+        if (replay) replay.push({ update: notification.update, receivedAt: Date.now() });
         else applyUpdate(session, notification.update);
         this.publish();
       },
@@ -140,10 +141,11 @@ export class Controller extends EventEmitter {
         } else if (info.agentCapabilities?.loadSession) {
           replay = [];
           result = await client.withTimeout(client.agent.request(acp.methods.agent.session.load, { sessionId: saved.remoteId, cwd: session.cwd, mcpServers: [] }));
+          if (this.closed || generation !== this.generation) return;
           // Replace only after a successful load, so failures preserve the local transcript.
           const updates = replay; replay = undefined;
           session.items = []; session.plan = [];
-          for (const update of updates) applyUpdate(session, update);
+          for (const { update, receivedAt } of updates) applyUpdate(session, update, receivedAt);
         } else {
           this.status = "history";
           this.error = "This agent cannot resume sessions. This is a read-only transcript; create a new session to chat.";

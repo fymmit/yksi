@@ -44,6 +44,7 @@ from other directories. Bundles require the preload too (see README).
 - `src/state.ts`: serializable conversation model and update reducer.
 - `src/storage.ts`: SQLite persistence, workspace-scoped local history.
 - `src/ui/`: Solid components, palette, composer, tool/diff rendering and themes.
+  `usage.ts` formats reported session cost and the local `/tui:usage` summary.
   `form.tsx` and `form-state.ts` render and validate keyboard-driven elicitation
   forms, with checkbox multi-selects for finite-choice string arrays and JSON
   fallback for other arrays and unsupported widget types.
@@ -64,6 +65,12 @@ from other directories. Bundles require the preload too (see README).
 - Advertise only implemented capabilities. Read models, modes and slash commands
   from agent responses/notifications. Command updates and plans are replacement
   snapshots; tool-call updates are sparse patches.
+- Stable ACP `usage_update` is a replacement snapshot: cost is cumulative, never
+  summed across notifications. Missing/null cost means not reported; zero is valid.
+  Persist `usageUpdatedAt` as the local receipt time, including through buffered
+  replay. Preserve saved usage on failed load or resume without a new reading;
+  clear usage when creating a new remote session. Display agent-reported currency
+  and cost without inferring subscription allowance or billing accuracy.
 - Client slash commands use `/tui:`; advertised agent commands use `/name`.
   Unknown slash commands must not silently become model prompts.
 - A local transcript is not a resumed agent session. Prefer advertised resume;
@@ -100,7 +107,11 @@ from other directories. Bundles require the preload too (see README).
 Implemented: stdio agents, streaming Markdown, tool cards/diffs, client file and
 terminal services, permissions, form/URL elicitation, cancellation, local session
 history and advertised resumption, file attachments, dynamic agent commands and
-configuration, configurable keybindings, themes, sidebar, export and offline demo. Input history is per
+configuration, configurable keybindings, themes, sidebar, export and offline demo.
+Standard ACP context and cumulative session cost appear in the sidebar when
+reported; **Show session usage** / `/tui:usage` shows a snapshot with local receipt
+time, including on narrow terminals. `app.usage` is unbound by default.
+Input history is per
 session; drafts survive session switches within the running TUI.
 Forms show one question at a time: Up/Down highlights boolean/enum options,
 Enter confirms and advances, Left/Right revisits questions with drafts retained.

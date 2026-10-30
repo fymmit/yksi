@@ -4,18 +4,34 @@ import { Readable, Writable } from "node:stream";
 const app = acp.agent({ name: "test-agent" })
   .onRequest("initialize", async () => {
     if (process.env.SLOW_INIT) await Bun.sleep(60_000);
-    return { protocolVersion: acp.PROTOCOL_VERSION, agentCapabilities: { loadSession: true }, authMethods: [] };
+    return { protocolVersion: acp.PROTOCOL_VERSION, agentCapabilities: { loadSession: true, ...(process.env.RESUME ? { sessionCapabilities: { resume: {} } } : {}) }, authMethods: [] };
   })
   .onRequest("session/new", () => ({ sessionId: "remote-session" }))
+  .onRequest("session/resume", () => ({}))
   .onRequest("session/load", async ctx => {
     for (const [role, text] of [["user_message_chunk", "Original prompt"], ["agent_message_chunk", "Authoritative replay"]] as const) {
       await ctx.client.notify("session/update", { sessionId: ctx.params.sessionId, update: { sessionUpdate: role, content: { type: "text", text } } });
     }
+    await ctx.client.notify("session/update", { sessionId: ctx.params.sessionId, update: {
+      sessionUpdate: "usage_update", used: 500, size: 200000, cost: { amount: 0.5, currency: "USD" },
+    } });
+    if (process.env.FAIL_LOAD) throw new Error("Fixture load failed after usage replay");
     return {};
   })
   .onRequest("session/prompt", async ctx => {
     const text = ctx.params.prompt[0];
     if (text?.type === "text" && text.text === "crash") process.exit(7);
+    if (text?.type === "text" && text.text === "usage") {
+      for (const amount of [1, 1, 0.25]) {
+        await ctx.client.notify("session/update", { sessionId: ctx.params.sessionId, update: {
+          sessionUpdate: "usage_update", used: 1000, size: 200000, cost: { amount, currency: "USD" },
+        } });
+      }
+      await ctx.client.notify("session/update", { sessionId: "another-session", update: {
+        sessionUpdate: "usage_update", used: 1, size: 200000, cost: { amount: 999, currency: "USD" },
+      } });
+      return { stopReason: "end_turn" };
+    }
     if (text?.type === "text" && text.text === "questions") {
       const answers = await Promise.all(["First question", "Second question"].map(message => ctx.client.request("elicitation/create", {
         sessionId: ctx.params.sessionId, mode: "form", message,

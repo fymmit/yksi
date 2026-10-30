@@ -22,6 +22,8 @@ export type Session = {
   configOptions: acp.SessionConfigOption[];
   modes?: acp.SessionModeState | null;
   usage?: acp.UsageUpdate;
+  /** Local receipt time of the latest usage snapshot, in epoch milliseconds. */
+  usageUpdatedAt?: number;
   terminalOutput?: Record<string, string>;
 };
 
@@ -46,7 +48,7 @@ export function addMessage(session: Session, role: Message["role"], text: string
 }
 
 /** Mutates the domain state; the controller publishes snapshots at frame rate. */
-export function applyUpdate(session: Session, update: acp.SessionUpdate) {
+export function applyUpdate(session: Session, update: acp.SessionUpdate, receivedAt = Date.now()) {
   session.updatedAt = Date.now();
   switch (update.sessionUpdate) {
     case "agent_message_chunk":
@@ -81,7 +83,9 @@ export function applyUpdate(session: Session, update: acp.SessionUpdate) {
     case "session_info_update":
       if (update.title != null) session.title = update.title;
       break;
-    case "usage_update": session.usage = update; break;
+    case "usage_update":
+      // Usage is a snapshot, and cost is cumulative rather than an increment.
+      session.usage = update; session.usageUpdatedAt = receivedAt; break;
     case "notice": addMessage(session, "system", `${update.title}${update.description ? `\n${update.description}` : ""}`); break;
   }
 }

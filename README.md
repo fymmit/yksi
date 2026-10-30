@@ -52,7 +52,7 @@ You can also run `bun /absolute/path/to/acp-tui/bin/acp-tui.ts` from any directo
 - ACP client filesystem operations and bounded, UTF-8-safe terminal output.
 - Cancellation, connection error reporting, explicit reconnect and process cleanup.
 - SQLite transcript history, supported remote resumption, Markdown export.
-- Responsive sidebar with agent plan, reported diffs and context usage when available.
+- Responsive sidebar with agent plan, reported diffs, context usage and reported session cost when available.
 - Light/dark themes and sidebar preferences retained across runs.
 - Configurable, context-aware keyboard shortcuts with hints that follow your settings.
 
@@ -92,9 +92,25 @@ agent. A second Escape during cancellation disconnects immediately.
 ### Commands and attachments
 
 Client commands are namespaced, for example `/tui:new`, `/tui:sessions`,
-`/tui:agents`, `/tui:reconnect`, `/tui:export`. Agent commands are discovered from
+`/tui:agents`, `/tui:reconnect`, `/tui:usage`, `/tui:export`. Agent commands are discovered from
 ACP, such as Copilot's `/plan` and `/review`. Type `/` and press Tab, or use Ctrl+P.
 Unadvertised slash commands are rejected locally to avoid accidental model calls.
+
+**Show session usage** in the palette (or `/tui:usage`) displays a local snapshot
+of the latest agent-reported session cost, context usage and receipt time. It also
+works with the sidebar hidden or on narrow terminals. The palette action preserves
+your draft; the slash command consumes only its command text. You can assign a
+shortcut to `app.usage` (unbound by default).
+
+Cost comes from stable ACP `usage_update` notifications and is shown in the agent's
+reported currency. Each update replaces the cumulative total; missing or null cost
+shows **Not reported**, while zero remains a valid cost. Costs over one cent show
+two fraction digits; amounts at or below one cent retain precision, using
+scientific notation below 0.000001. Invalid cost values
+show **Unavailable**. Cost and its local receipt time are saved with the session;
+history and resumed sessions retain the last reading until another update arrives.
+Older transcripts may have no receipt timestamp. Reported cost may be an estimate
+and does not indicate subscription allowance, remaining budget or an actual bill.
 
 File attachments are explicit selections via Ctrl+F or `@` then Tab. Attached text
 is read when submitting (up to 1 MiB per file), embedded as an ACP resource when
@@ -236,6 +252,7 @@ Application actions are active with the composer, except where noted:
 | `app.earlier` | Unbound | Show earlier messages |
 | `app.export` | Unbound | Export transcript |
 | `app.paths` | Unbound | Show configuration/data paths |
+| `app.usage` | Unbound | Show last reported session cost/context |
 
 Composer, picker, and interaction actions are active only in their corresponding UI:
 

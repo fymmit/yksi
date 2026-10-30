@@ -64,6 +64,75 @@ test("reactive streaming and expanded diffs render after initial mount", async (
   } finally { controller.dispose(); await setup.dispose(); storage.close(); }
 });
 
+test("sidebar cost follows ACP snapshots including zero, missing cost and changed currency", async () => {
+  const storage = new Storage(":memory:");
+  const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");
+  const setup = await testRender(() => <App controller={controller} quit={() => {}} autoConnect={false} />, { width: 110, height: 35 });
+  try {
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("Reported cost:");
+    for (const [cost, label] of [
+      [{ amount: 0.045, currency: "USD" }, "USD 0.05"],
+      [{ amount: 0, currency: "USD" }, "USD 0.00"],
+      [{ amount: 0.5, currency: "EUR" }, "EUR 0.50"],
+      [undefined, "Not reported"],
+      [null, "Not reported"],
+    ] as const) {
+      applyUpdate(controller.session, { sessionUpdate: "usage_update", used: 100, size: 200, cost });
+      controller.emit("change", controller.snapshot());
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).toContain("Reported cost:");
+      expect(setup.captureCharFrame()).toContain(label);
+      expect(setup.captureCharFrame()).toContain("Context: 100 / 200");
+    }
+  } finally { controller.dispose(); await setup.dispose(); storage.close(); }
+});
+
+test("usage palette preserves the draft at narrow widths and the slash command runs locally", async () => {
+  const storage = new Storage(":memory:");
+  const controller = new Controller(configSchema.parse({ keybindings: { "app.usage": ["f2"] } }), storage, "/project", "copilot");
+  applyUpdate(controller.session, { sessionUpdate: "usage_update", used: 100, size: 200, cost: { amount: 0.045, currency: "USD" } }, 1000);
+  controller.status = "history";
+  controller.error = "Agent cannot resume this transcript";
+  const prompts: string[] = [];
+  controller.send = async text => { prompts.push(text); };
+  const setup = await testRender(() => <App controller={controller} quit={() => {}} autoConnect={false} />, { width: 60, height: 24, kittyKeyboard: true });
+  try {
+    await setup.renderOnce();
+    await setup.mockInput.typeText("Keep this draft");
+    setup.mockInput.pressKey("p", { ctrl: true });
+    await setup.renderOnce();
+    await setup.mockInput.typeText("Show session usage");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Show session usage");
+    expect(setup.captureCharFrame()).toContain("F2");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Reported session cost: USD 0.05");
+    expect(setup.captureCharFrame()).toContain("Context: 100 / 200");
+    expect(setup.captureCharFrame()).toContain("Last received:");
+    expect(setup.captureCharFrame()).toContain("Keep this draft");
+    expect(controller.error).toBeUndefined();
+
+    setup.mockInput.pressKey("ESCAPE");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).not.toContain("Reported session cost:");
+    setup.mockInput.pressKey("F2");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Reported session cost: USD 0.05");
+    expect(setup.captureCharFrame()).toContain("Keep this draft");
+
+    for (let i = 0; i < "Keep this draft".length; i++) setup.mockInput.pressKey("BACKSPACE");
+    await setup.mockInput.typeText("/tui:usage");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Reported session cost: USD 0.05");
+    expect(prompts).toEqual([]);
+    expect(controller.error).toBeUndefined();
+    expect(setup.captureCharFrame()).not.toContain("/tui:usage");
+  } finally { controller.dispose(); await setup.dispose(); storage.close(); }
+});
+
 test("composer submits the editor buffer when text and Enter arrive together", async () => {
   const storage = new Storage(":memory:");
   const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");

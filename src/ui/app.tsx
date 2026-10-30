@@ -13,6 +13,7 @@ import { syntaxStyle, themes, type ThemeName } from "./theme";
 import { Picker, type Choice } from "./picker";
 import { InteractionView } from "./interaction";
 import { TimelineEntry } from "./timeline";
+import { formatCost, usageSummary } from "./usage";
 
 export function App(props: { controller: Controller; quit: () => void; autoConnect?: boolean }) {
   const controller = props.controller;
@@ -46,6 +47,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const listener = (snapshot: Snapshot) => {
     const previousId = state.session.id;
     if (previousId !== snapshot.session.id) {
+      setNotice("");
       drafts.set(previousId, { text: draft(), attachments: attachments() });
       const saved = drafts.get(snapshot.session.id);
       replaceDraft(saved?.text ?? ""); setAttachments(saved?.attachments ?? []);
@@ -86,6 +88,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     { id: "sessions", label: "Switch session", run: showSessions },
     { id: "agents", label: "Switch agent", run: showAgents },
     { id: "config", label: "Model, mode and agent settings", detail: "advertised by the agent", run: showConfig },
+    { id: "usage", label: "Show session usage", detail: "last reported cost and context", run: () => { controller.clearError(); setNotice(usageSummary(state.session)); } },
     { id: "files", label: "Attach file", run: showFiles },
     { id: "clear-attachments", label: "Clear attachments", run: () => setAttachments([]) },
     { id: "reconnect", label: "Reconnect current session", run: () => controller.open(state.session.remoteId ? controller.session : undefined) },
@@ -201,6 +204,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           <For each={state.session.configOptions}>{option => <text fg={theme().muted}>{option.name}: {String(option.currentValue)}</text>}</For>
           <Show when={state.session.modes}><text fg={theme().muted}>Mode: {state.session.modes?.currentModeId}</text></Show>
           <Show when={state.session.usage}><text fg={theme().muted}>Context: {state.session.usage?.used.toLocaleString()} / {state.session.usage?.size.toLocaleString()}</text></Show>
+          <Show when={state.session.usage}><text fg={theme().muted}>Reported cost:{"\n"}{formatCost(state.session.usage?.cost)}</text></Show>
           <Show when={state.session.plan.length}><text fg={theme().accent} marginTop={1}>Plan</text></Show>
           <For each={state.session.plan}>{entry => <text fg={entry.status === "completed" ? theme().muted : theme().text}>{entry.status === "completed" ? "✓" : entry.status === "in_progress" ? "›" : "○"} {entry.content}</text>}</For>
           <Show when={changedFiles(state.session).length}><text fg={theme().accent} marginTop={1}>Reported diffs</text></Show>
@@ -209,7 +213,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         </scrollbox>
       </Show>
     </box>
-    <Show when={state.error || notice()}><text fg={state.error ? theme().error : theme().muted} paddingX={1} maxHeight={3}>{state.error ?? notice()}</text></Show>
+    <Show when={state.error || notice()}><text fg={state.error ? theme().error : theme().muted} paddingX={1} maxHeight={3} flexShrink={0}>{state.error ?? notice()}</text></Show>
     <Show when={palette()} keyed>{menu => <Picker title={menu.title} choices={menu.choices} theme={theme()} keys={keys} height={dimensions().height} close={() => setPalette(undefined)} error={error => controller.report(error)} />}</Show>
     <Show when={state.interaction} keyed>{interaction => <InteractionView interaction={interaction} theme={theme()} keys={keys} answer={(id, content) => controller.answer(id, content)} />}</Show>
     <box border borderColor={busy() ? theme().accent : theme().border} backgroundColor={theme().panel} flexDirection="column" paddingX={1} flexShrink={0}>
