@@ -48,6 +48,7 @@ You can also run `bun /absolute/path/to/acp-tui/bin/acp-tui.ts` from any directo
 - Multiline composer, bracketed paste, per-session prompt history and draft retention.
 - Searchable command, agent, session, file and model/mode pickers.
 - Agent-advertised commands and configuration, including boolean options.
+- Remembered model selections per agent, across new sessions and application restarts.
 - Permission prompts using the agent's exact options; keyboard-driven structured forms.
 - ACP client filesystem operations and bounded, UTF-8-safe terminal output.
 - Cancellation, connection error reporting, explicit reconnect and process cleanup.
@@ -118,6 +119,15 @@ grouped choices or a boolean toggle), or the older session modes API when the
 agent provides no config options. Uncategorized settings remain available through
 Ctrl+M. Repeated key events and additional presses while a setting change is
 pending are ignored; the displayed mode follows agent-confirmed state.
+
+Choose a model through **Ctrl+M** to remember it for future sessions. The last
+agent-confirmed selection is saved per configured agent, across projects and
+application restarts. New sessions restore it before accepting prompts, using the
+agent's ACP `model` config category and advertised choices. Resumed/loaded sessions
+keep their own model. If the remembered model is unavailable or the agent rejects
+it, a notice explains the fallback and the session remains usable; the preference
+is retained for the next new session. Until you select a model, the initial model
+comes from the agent.
 
 ### Commands and attachments
 
@@ -319,7 +329,7 @@ events so holding a key cannot confirm multiple answers. Navigation can repeat.
 
 Stored under `~/.local/share/acp-tui/` (or `$XDG_DATA_HOME/acp-tui/`):
 
-- `history.sqlite`: transcripts, remote session IDs, retained terminal output and UI preferences.
+- `history.sqlite`: transcripts, remote session IDs, retained terminal output, per-agent model selections and UI preferences.
 - `agent.log`: agent stderr, kept out of the terminal interface.
 
 Set `ACP_TUI_DATA_DIR` to use a separate data directory, e.g. for a demo. Local

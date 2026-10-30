@@ -94,6 +94,7 @@ export class Controller extends EventEmitter {
     this.session.commands = []; this.session.configOptions = []; this.session.modes = undefined;
     this.terminalOutput = this.session.terminalOutput ?? {}; this.status = "connecting"; this.error = undefined;
     const session = this.session;
+    const current = () => !this.closed && generation === this.generation && this.status !== "disconnected";
     let replay: { update: acp.SessionUpdate; receivedAt: number }[] | undefined;
     const client = this.client = new AgentClient(definition, session.cwd, {
       update: notification => {
@@ -156,10 +157,36 @@ export class Controller extends EventEmitter {
         }
       } else {
         result = await client.withTimeout(client.agent.request(acp.methods.agent.session.new, { cwd: session.cwd, mcpServers: [] }));
+        if (this.closed || generation !== this.generation) return;
         session.remoteId = (result as acp.NewSessionResponse).sessionId;
       }
       if (this.closed || generation !== this.generation) return;
       session.modes = result.modes; session.configOptions = result.configOptions ?? [];
+      if (!saved?.remoteId) {
+        const remembered = this.storage.setting<string | undefined>(`model:${session.agent}`, undefined);
+        const model = session.configOptions.find(option => option.category === "model" && option.type === "select");
+        if (remembered !== undefined && model?.currentValue !== remembered) {
+          const choices = model?.type === "select" ? model.options.flatMap(option => "options" in option ? option.options : [option]) : [];
+          if (!model || !choices.some(choice => choice.value === remembered)) {
+            this.error = `Remembered model "${remembered}" is unavailable; using the agent's default.`;
+          } else {
+            try {
+              const configured = await client.withTimeout(client.agent.request(acp.methods.agent.session.setConfigOption, {
+                sessionId: session.remoteId!, configId: model.id, value: remembered,
+              }));
+              if (!current()) return;
+              session.configOptions = configured.configOptions;
+              if (!session.configOptions.some(option => option.id === model.id && option.currentValue === remembered)) {
+                this.error = `The agent did not confirm remembered model "${remembered}"; using the agent's current model.`;
+              }
+            } catch (error) {
+              if (!current()) return;
+              this.error = `Could not restore remembered model "${remembered}"; using the agent's current model. ${error instanceof Error ? error.message : String(error)}`;
+            }
+          }
+        }
+      }
+      if (!current()) return;
       this.status = "ready"; this.persist(); this.publish(true);
     } catch (error) {
       if (this.closed || generation !== this.generation) return;
@@ -222,12 +249,19 @@ export class Controller extends EventEmitter {
     });
   }
   async setConfig(configId: string, value: string | boolean) {
+    const model = this.session.configOptions.find(option => option.category === "model" && option.type === "select");
     await this.changeSetting((client, session) => {
       const params: acp.SetSessionConfigOptionRequest = typeof value === "boolean"
         ? { sessionId: session.remoteId!, configId, type: "boolean", value }
         : { sessionId: session.remoteId!, configId, value };
       return client.agent.request(acp.methods.agent.session.setConfigOption, params);
-    }, (result, session) => { session.configOptions = result.configOptions; });
+    }, (result, session) => {
+      session.configOptions = result.configOptions;
+      if (model?.id === configId) {
+        const confirmed = result.configOptions.find(option => option.id === configId && option.category === "model" && option.type === "select");
+        if (confirmed) this.storage.setSetting(`model:${session.agent}`, confirmed.currentValue);
+      }
+    });
   }
   async cycleMode() {
     // Ignore rapid presses until the agent confirms the previous setting change.

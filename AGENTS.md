@@ -88,6 +88,13 @@ from other directories. Bundles require the preload too (see README).
   choice order (flattening groups), or toggles a boolean mode. Legacy modes are
   used only without config options. Setting changes require an idle session,
   serialize requests, and discard stale results/errors after session replacement.
+- Remember the last explicitly selected, agent-confirmed model in SQLite settings
+  per configured agent (`model:<agent>`), across projects and restarts. Use the first
+  select config option categorized as `model`, including grouped choices. Restore
+  it only for new remote sessions, while still connecting; resumed/loaded sessions
+  retain their remote model. Missing/rejected choices produce a notice without
+  losing the preference or blocking a usable connection. Agent-initiated/dependent
+  model updates and stale setting responses must not overwrite the preference.
 - Resolve pending interaction promises on cancellation/disconnect. An agent's
   permission option IDs and scope labels are authoritative.
 - ACP paths are absolute, line numbers 1-based. Filesystem and command execution
