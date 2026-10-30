@@ -9,8 +9,14 @@ import { stopProcess, Terminals } from "./terminals";
 
 export type ClientEvents = {
   update: (notification: acp.SessionNotification) => void;
-  permission: (params: acp.RequestPermissionRequest, signal: AbortSignal) => Promise<acp.RequestPermissionResponse>;
-  question: (params: acp.CreateElicitationRequest, signal: AbortSignal) => Promise<acp.CreateElicitationResponse>;
+  permission: (
+    params: acp.RequestPermissionRequest,
+    signal: AbortSignal,
+  ) => Promise<acp.RequestPermissionResponse>;
+  question: (
+    params: acp.CreateElicitationRequest,
+    signal: AbortSignal,
+  ) => Promise<acp.CreateElicitationResponse>;
   terminal: (id: string, output: string) => void;
   elicitationComplete?: (id: string) => void;
   disconnected: (message: string) => void;
@@ -24,18 +30,30 @@ export class AgentClient {
   private failed = false;
   info?: acp.InitializeResponse;
 
-  constructor(private definition: AgentDefinition, private cwd: string, private events: ClientEvents, private logPath?: string) {
+  constructor(
+    private definition: AgentDefinition,
+    private cwd: string,
+    private events: ClientEvents,
+    private logPath?: string,
+  ) {
     this.terminals = new Terminals(cwd, events.terminal);
   }
   async connect() {
-    const child = this.child = spawn(this.definition.command, this.definition.args, {
-      cwd: this.cwd, env: { ...process.env, ...this.definition.env }, stdio: "pipe", detached: process.platform !== "win32",
-    });
+    const child = (this.child = spawn(this.definition.command, this.definition.args, {
+      cwd: this.cwd,
+      env: { ...process.env, ...this.definition.env },
+      stdio: "pipe",
+      detached: process.platform !== "win32",
+    }));
     // Never inherit agent stderr: it would overwrite the alternate-screen UI.
     if (this.logPath) mkdirSync(dirname(this.logPath), { recursive: true, mode: 0o700 });
     child.stderr.on("data", chunk => {
       if (this.logPath) {
-        try { appendFileSync(this.logPath, chunk, { mode: 0o600 }); } catch { /* Diagnostics must not break a turn. */ }
+        try {
+          appendFileSync(this.logPath, chunk, { mode: 0o600 });
+        } catch {
+          /* Diagnostics must not break a turn. */
+        }
       }
     });
     const fail = (message: string) => {
@@ -46,16 +64,28 @@ export class AgentClient {
       stopProcess(child);
       this.events.disconnected(message);
     };
-    child.on("error", error => fail(`Could not launch ${this.definition.command}: ${error.message}`));
-    child.on("exit", (code, signal) => fail(`Agent exited (${signal ?? code ?? "unknown"}). Reconnect from the command palette.`));
-    const stream = acp.ndJsonStream(
-      Writable.toWeb(child.stdin), Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
+    child.on("error", error =>
+      fail(`Could not launch ${this.definition.command}: ${error.message}`),
     );
-    this.connection = acp.client({ name: "acp-tui" })
+    child.on("exit", (code, signal) =>
+      fail(`Agent exited (${signal ?? code ?? "unknown"}). Reconnect from the command palette.`),
+    );
+    const stream = acp.ndJsonStream(
+      Writable.toWeb(child.stdin),
+      Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
+    );
+    this.connection = acp
+      .client({ name: "acp-tui" })
       .onNotification(acp.methods.client.session.update, ctx => this.events.update(ctx.params))
-      .onNotification(acp.methods.client.elicitation.complete, ctx => this.events.elicitationComplete?.(ctx.params.elicitationId))
-      .onRequest(acp.methods.client.session.requestPermission, ctx => this.events.permission(ctx.params, ctx.signal))
-      .onRequest(acp.methods.client.elicitation.create, ctx => this.events.question(ctx.params, ctx.signal))
+      .onNotification(acp.methods.client.elicitation.complete, ctx =>
+        this.events.elicitationComplete?.(ctx.params.elicitationId),
+      )
+      .onRequest(acp.methods.client.session.requestPermission, ctx =>
+        this.events.permission(ctx.params, ctx.signal),
+      )
+      .onRequest(acp.methods.client.elicitation.create, ctx =>
+        this.events.question(ctx.params, ctx.signal),
+      )
       .onRequest(acp.methods.client.fs.readTextFile, ctx => readTextFile(ctx.params))
       .onRequest(acp.methods.client.fs.writeTextFile, ctx => writeTextFile(ctx.params))
       .onRequest(acp.methods.client.terminal.create, ctx => this.terminals.create(ctx.params))
@@ -67,14 +97,18 @@ export class AgentClient {
     void this.connection.closed.then(() => {
       if (!this.disposed) fail("Agent connection closed. Reconnect from the command palette.");
     });
-    this.info = await this.withTimeout(this.agent.request(acp.methods.agent.initialize, {
-      protocolVersion: acp.PROTOCOL_VERSION,
-      clientInfo: { name: "acp-tui", version: "0.1.0" },
-      clientCapabilities: {
-        fs: { readTextFile: true, writeTextFile: true }, terminal: true,
-        elicitation: { form: {}, url: {} }, session: { notices: {}, configOptions: { boolean: {} } },
-      },
-    }));
+    this.info = await this.withTimeout(
+      this.agent.request(acp.methods.agent.initialize, {
+        protocolVersion: acp.PROTOCOL_VERSION,
+        clientInfo: { name: "acp-tui", version: "0.1.0" },
+        clientCapabilities: {
+          fs: { readTextFile: true, writeTextFile: true },
+          terminal: true,
+          elicitation: { form: {}, url: {} },
+          session: { notices: {}, configOptions: { boolean: {} } },
+        },
+      }),
+    );
     if (this.info.protocolVersion !== acp.PROTOCOL_VERSION) {
       this.dispose();
       throw new Error(`Unsupported ACP protocol version: ${this.info.protocolVersion}`);
@@ -82,19 +116,27 @@ export class AgentClient {
     return this.info;
   }
   get agent() {
-    if (!this.connection || this.connection.signal.aborted) throw new Error("Agent is not connected");
+    if (!this.connection || this.connection.signal.aborted)
+      throw new Error("Agent is not connected");
     return this.connection.agent;
   }
   async withTimeout<T>(promise: Promise<T>, ms = 20_000): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await Promise.race([promise, new Promise<never>((_, reject) => {
-        timer = setTimeout(() => {
-          const message = "Agent request timed out. Reconnect to try again.";
-          this.dispose(); this.events.disconnected(message); reject(new Error(message));
-        }, ms);
-      })]);
-    } finally { clearTimeout(timer); }
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            const message = "Agent request timed out. Reconnect to try again.";
+            this.dispose();
+            this.events.disconnected(message);
+            reject(new Error(message));
+          }, ms);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
   dispose() {
     if (this.disposed) return;

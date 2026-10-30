@@ -22,7 +22,8 @@ export type Config = z.infer<typeof configSchema>;
 export function appPaths(env = process.env) {
   return {
     config: join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "acp-tui", "config.json"),
-    data: env.ACP_TUI_DATA_DIR || join(env.XDG_DATA_HOME || join(homedir(), ".local/share"), "acp-tui"),
+    data:
+      env.ACP_TUI_DATA_DIR || join(env.XDG_DATA_HOME || join(homedir(), ".local/share"), "acp-tui"),
   };
 }
 
@@ -33,11 +34,16 @@ export async function loadConfig(path = appPaths().config, explicit = false): Pr
     return configSchema.parse({});
   }
   const config = configSchema.parse(await file.json());
-  if (!config.agents[config.defaultAgent]) throw new Error(`Unknown defaultAgent: ${config.defaultAgent}`);
+  if (!config.agents[config.defaultAgent])
+    throw new Error(`Unknown defaultAgent: ${config.defaultAgent}`);
   return config;
 }
 
 export function demoAgent(): AgentDefinition {
   const compiled = resolve(import.meta.dir, "demo-agent.js");
-  return { command: process.execPath, args: [existsSync(compiled) ? compiled : resolve(import.meta.dir, "demo-agent.ts")], env: {} };
+  return {
+    command: process.execPath,
+    args: [existsSync(compiled) ? compiled : resolve(import.meta.dir, "demo-agent.ts")],
+    env: {},
+  };
 }

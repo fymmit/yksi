@@ -12,8 +12,15 @@ export function consumeKey(key: KeyEvent, repeat = false) {
  * through to those defaults after being rebound or disabled. Other editing
  * shortcuts keep their native behavior. Call after matching configured actions. */
 export function suppressEditorFallback(key: KeyEvent, cursor = false) {
-  if (defaultTextareaKeyBindings.some(binding =>
-    (binding.action === "submit" || binding.action === "newline" || (cursor && (binding.action === "move-left" || binding.action === "move-right"))) && matchesKey(key, binding))) {
+  if (
+    defaultTextareaKeyBindings.some(
+      binding =>
+        (binding.action === "submit" ||
+          binding.action === "newline" ||
+          (cursor && (binding.action === "move-left" || binding.action === "move-right"))) &&
+        matchesKey(key, binding),
+    )
+  ) {
     consumeKey(key);
   }
 }

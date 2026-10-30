@@ -9,8 +9,19 @@ function setup() {
   const storage = new Storage(":memory:");
   const definition = demoAgent();
   definition.env.ACP_DEMO_FAST = "1";
-  const controller = new Controller({ defaultAgent: "demo", agents: { demo: definition } }, storage, resolve(import.meta.dir, ".."), "demo");
-  return { controller, dispose: () => { controller.dispose(); storage.close(); } };
+  const controller = new Controller(
+    { defaultAgent: "demo", agents: { demo: definition } },
+    storage,
+    resolve(import.meta.dir, ".."),
+    "demo",
+  );
+  return {
+    controller,
+    dispose: () => {
+      controller.dispose();
+      storage.close();
+    },
+  };
 }
 
 test("stdio handshake, command discovery, permission, streamed tool output and persistence", async () => {
@@ -18,7 +29,10 @@ test("stdio handshake, command discovery, permission, streamed tool output and p
   try {
     let permissions = 0;
     controller.on("change", (state: Snapshot) => {
-      if (state.interaction) { permissions++; controller.answer("allow"); }
+      if (state.interaction) {
+        permissions++;
+        controller.answer("allow");
+      }
     });
     await controller.open();
     expect(controller.status).toBe("ready");
@@ -26,16 +40,22 @@ test("stdio handshake, command discovery, permission, streamed tool output and p
     await controller.send("Show me the flow");
     expect(permissions).toBe(1);
     expect(controller.status).toBe("ready");
-    expect(controller.session.items.some(item => item.type === "tool" && item.status === "completed")).toBe(true);
+    expect(
+      controller.session.items.some(item => item.type === "tool" && item.status === "completed"),
+    ).toBe(true);
     const last = controller.session.items.at(-1);
     expect(last?.type === "message" && last.text.includes("Welcome to ACP TUI")).toBe(true);
     expect(controller.storage.list(controller.cwd)[0]?.items).toEqual(controller.session.items);
     await controller.setMode("plan");
     expect(controller.session.modes?.currentModeId).toBe("plan");
     await controller.cycleMode();
-    expect(controller.session.configOptions.find(option => option.category === "mode")?.currentValue).toBe("code");
+    expect(
+      controller.session.configOptions.find(option => option.category === "mode")?.currentValue,
+    ).toBe("code");
     expect(controller.session.modes?.currentModeId).toBe("code");
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 }, 15_000);
 
 test("cancellation resolves an outstanding permission and allows the next turn", async () => {
@@ -48,34 +68,50 @@ test("cancellation resolves an outstanding permission and allows the next turn",
     await controller.send("Show me a permission");
     expect(controller.snapshot().interaction).toBeUndefined();
     expect(controller.status).toBe("ready");
-    expect(controller.session.items.at(-1)).toMatchObject({ role: "system", text: "Turn stopped: cancelled" });
+    expect(controller.session.items.at(-1)).toMatchObject({
+      role: "system",
+      text: "Turn stopped: cancelled",
+    });
     await controller.send("/help");
     expect(controller.status).toBe("ready");
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 }, 15_000);
 
 test("structured input is returned to the agent", async () => {
   const { controller, dispose } = setup();
   try {
-    controller.on("change", (state: Snapshot) => { if (state.interaction?.form) controller.answer("accept", { name: "Example", tests: true }); });
+    controller.on("change", (state: Snapshot) => {
+      if (state.interaction?.form) controller.answer("accept", { name: "Example", tests: true });
+    });
     await controller.open();
     await controller.send("/question");
     const last = controller.session.items.at(-1);
     expect(last?.type === "message" && last.text.includes('"name":"Example"')).toBe(true);
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("structured question decline and cancel outcomes round trip over ACP", async () => {
   for (const action of ["decline", "cancel"]) {
     const { controller, dispose } = setup();
     try {
-      controller.on("change", (state: Snapshot) => { if (state.interaction?.form) controller.answer(action === "decline" ? "decline" : undefined); });
+      controller.on("change", (state: Snapshot) => {
+        if (state.interaction?.form)
+          controller.answer(action === "decline" ? "decline" : undefined);
+      });
       await controller.open();
       await controller.send("/question");
       const last = controller.session.items.at(-1);
-      expect(last?.type === "message" && JSON.parse(last.text.replace("Your answer: ", ""))).toEqual({ action });
+      expect(
+        last?.type === "message" && JSON.parse(last.text.replace("Your answer: ", "")),
+      ).toEqual({ action });
       expect(controller.snapshot().interaction).toBeUndefined();
-    } finally { dispose(); }
+    } finally {
+      dispose();
+    }
   }
 });
 
@@ -84,7 +120,9 @@ test("cancelling a turn resolves all queued forms", async () => {
   controller.config.agents.demo!.args = [resolve(import.meta.dir, "fixtures/agent.ts")];
   try {
     const asked = new Promise<void>(resolve => {
-      controller.on("change", (state: Snapshot) => { if (state.interaction?.form) resolve(); });
+      controller.on("change", (state: Snapshot) => {
+        if (state.interaction?.form) resolve();
+      });
     });
     await controller.open();
     const turn = controller.send("questions");
@@ -94,20 +132,28 @@ test("cancelling a turn resolves all queued forms", async () => {
     expect(controller.snapshot().interaction).toBeUndefined();
     expect(controller.status).toBe("ready");
     const last = controller.session.items.at(-1);
-    expect(last?.type === "message" && JSON.parse(last.text)).toEqual([{ action: "cancel" }, { action: "cancel" }]);
-  } finally { dispose(); }
+    expect(last?.type === "message" && JSON.parse(last.text)).toEqual([
+      { action: "cancel" },
+      { action: "cancel" },
+    ]);
+  } finally {
+    dispose();
+  }
 });
 
 test("failed remote load preserves a readable local transcript", async () => {
   const { controller, dispose } = setup();
   try {
-    await controller.open(); await controller.send("/help");
+    await controller.open();
+    await controller.send("/help");
     const saved = structuredClone(controller.session);
     await controller.open(saved);
     expect(controller.status).toBe("history");
     expect(controller.session.items).toEqual(saved.items);
     expect(controller.error).toContain("lifetime");
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("missing executable produces a recoverable connection error", async () => {
@@ -117,7 +163,9 @@ test("missing executable produces a recoverable connection error", async () => {
     await controller.open();
     expect(controller.status).toBe("disconnected");
     expect(controller.error).toBeTruthy();
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("successful session load replaces local history rather than duplicating replay", async () => {
@@ -126,24 +174,34 @@ test("successful session load replaces local history rather than duplicating rep
   try {
     await controller.open();
     await controller.send("Run a command");
-    expect(Object.values(controller.session.terminalOutput ?? {})).toEqual(["terminal through ACP\n"]);
+    expect(Object.values(controller.session.terminalOutput ?? {})).toEqual([
+      "terminal through ACP\n",
+    ]);
     await controller.open(structuredClone(controller.session));
     expect(controller.status).toBe("ready");
     expect(controller.session.items).toHaveLength(2);
-    expect(controller.session.items[1]).toMatchObject({ role: "agent", text: "Authoritative replay" });
-  } finally { dispose(); }
+    expect(controller.session.items[1]).toMatchObject({
+      role: "agent",
+      text: "Authoritative replay",
+    });
+  } finally {
+    dispose();
+  }
 });
 
 test("agent crash rejects the pending turn and a new session can reconnect", async () => {
   const { controller, dispose } = setup();
   controller.config.agents.demo!.args = [resolve(import.meta.dir, "fixtures/agent.ts")];
   try {
-    await controller.open(); await controller.send("crash");
+    await controller.open();
+    await controller.send("crash");
     expect(controller.status).toBe("disconnected");
     expect(controller.session.items[0]).toMatchObject({ role: "user", text: "crash" });
     await controller.open();
     expect(controller.status).toBe("ready");
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("cancelling initialization does not let a stale connection overwrite its replacement", async () => {
@@ -158,7 +216,9 @@ test("cancelling initialization does not let a stale connection overwrite its re
     await opening;
     expect(controller.status).toBe("ready");
     expect(controller.error).toBeUndefined();
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("ACP costs persist, replay replaces totals, and new sessions reject old connection updates", async () => {
@@ -181,9 +241,15 @@ test("ACP costs persist, replay replaces totals, and new sessions reject old con
 
     await controller.open();
     expect(controller.session.usage).toBeUndefined();
-    oldEvents.update({ sessionId: controller.session.remoteId!, update: {
-      sessionUpdate: "usage_update", used: 1, size: 200000, cost: { amount: 999, currency: "USD" },
-    } });
+    oldEvents.update({
+      sessionId: controller.session.remoteId!,
+      update: {
+        sessionUpdate: "usage_update",
+        used: 1,
+        size: 200000,
+        cost: { amount: 999, currency: "USD" },
+      },
+    });
     expect(controller.session.usage).toBeUndefined();
     expect(controller.session.usageUpdatedAt).toBeUndefined();
 
@@ -192,7 +258,9 @@ test("ACP costs persist, replay replaces totals, and new sessions reject old con
     expect(controller.status).toBe("ready");
     expect(controller.session.usage).toBeUndefined();
     expect(controller.session.usageUpdatedAt).toBeUndefined();
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("failed ACP replay preserves saved usage and receipt time", async () => {
@@ -208,7 +276,9 @@ test("failed ACP replay preserves saved usage and receipt time", async () => {
     expect(controller.session.items).toEqual(saved.items);
     expect(controller.session.usage).toEqual(saved.usage);
     expect(controller.session.usageUpdatedAt).toBe(saved.usageUpdatedAt);
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("ACP resume retains the last reading until the agent reports usage again", async () => {
@@ -226,5 +296,7 @@ test("ACP resume retains the last reading until the agent reports usage again", 
     await controller.send("usage");
     expect(controller.session.usage?.cost?.amount).toBe(0.25);
     expect(controller.session.usageUpdatedAt!).toBeGreaterThanOrEqual(saved.usageUpdatedAt!);
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });

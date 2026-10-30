@@ -9,19 +9,44 @@ import { resolveKeybindings, type KeyOverrides } from "../src/keybindings";
 
 async function renderApp(keybindings: KeyOverrides = {}, width = 110) {
   const storage = new Storage(":memory:");
-  const controller = new Controller(configSchema.parse({ keybindings }), storage, "/project", "copilot");
+  const controller = new Controller(
+    configSchema.parse({ keybindings }),
+    storage,
+    "/project",
+    "copilot",
+  );
   controller.status = "ready";
   const prompts: string[] = [];
   const answers: unknown[] = [];
   let cancellations = 0;
-  controller.send = async text => { prompts.push(text); };
-  controller.answer = (id, content) => { answers.push({ id, content }); };
-  controller.cancel = async () => { cancellations++; };
-  const setup = await testRender(() => <App controller={controller} quit={() => {}} autoConnect={false} />, { width, height: 35, kittyKeyboard: true });
+  controller.send = async text => {
+    prompts.push(text);
+  };
+  controller.answer = (id, content) => {
+    answers.push({ id, content });
+  };
+  controller.cancel = async () => {
+    cancellations++;
+  };
+  const setup = await testRender(
+    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    { width, height: 35, kittyKeyboard: true },
+  );
   await setup.renderOnce();
-  return { ...setup, controller, storage, prompts, answers, cancellations: () => cancellations,
+  return {
+    ...setup,
+    controller,
+    storage,
+    prompts,
+    answers,
+    cancellations: () => cancellations,
     footer: () => setup.captureCharFrame().trimEnd().split("\n").at(-1)!.trim(),
-    async cleanup() { controller.dispose(); await setup.dispose(); storage.close(); } };
+    async cleanup() {
+      controller.dispose();
+      await setup.dispose();
+      storage.close();
+    },
+  };
 }
 
 test("compact status summarizes sidebar data, adapts to width and preserves the sidebar preference", async () => {
@@ -29,18 +54,56 @@ test("compact status summarizes sidebar data, adapts to width and preserves the 
   try {
     setup.controller.session.title = "Fix login";
     setup.controller.session.configOptions = [
-      { id: "model", name: "Model", category: "model", type: "select", currentValue: "internal-model", options: [{ group: "models", name: "Models", options: [{ value: "internal-model", name: "Friendly model" }] }] },
+      {
+        id: "model",
+        name: "Model",
+        category: "model",
+        type: "select",
+        currentValue: "internal-model",
+        options: [
+          {
+            group: "models",
+            name: "Models",
+            options: [{ value: "internal-model", name: "Friendly model" }],
+          },
+        ],
+      },
       { id: "mode", name: "Mode", category: "mode", type: "boolean", currentValue: true },
     ];
-    applyUpdate(setup.controller.session, { sessionUpdate: "usage_update", used: 24000, size: 128000, cost: { currency: "USD", amount: 0 } });
-    applyUpdate(setup.controller.session, { sessionUpdate: "plan", entries: [
-      { content: "Inspect login", priority: "medium", status: "completed" },
-      { content: "Implement fix", priority: "medium", status: "in_progress" },
-    ] });
-    applyUpdate(setup.controller.session, { sessionUpdate: "tool_call", toolCallId: "edit", title: "Edit login", status: "completed", content: [{ type: "diff", path: "/project/login.ts", oldText: "old", newText: "new" }] });
+    applyUpdate(setup.controller.session, {
+      sessionUpdate: "usage_update",
+      used: 24000,
+      size: 128000,
+      cost: { currency: "USD", amount: 0 },
+    });
+    applyUpdate(setup.controller.session, {
+      sessionUpdate: "plan",
+      entries: [
+        { content: "Inspect login", priority: "medium", status: "completed" },
+        { content: "Implement fix", priority: "medium", status: "in_progress" },
+      ],
+    });
+    applyUpdate(setup.controller.session, {
+      sessionUpdate: "tool_call",
+      toolCallId: "edit",
+      title: "Edit login",
+      status: "completed",
+      content: [{ type: "diff", path: "/project/login.ts", oldText: "old", newText: "new" }],
+    });
     setup.controller.emit("change", setup.controller.snapshot());
     await setup.renderOnce();
-    for (const text of ["Fix login", "copilot", "Model: Friendly model", "Mode: On", "Context 24k/128k", "USD 0.00", "Plan 1/2", "1 file", "F1 Help"]) expect(setup.footer()).toContain(text);
+    for (const text of [
+      "Fix login",
+      "copilot",
+      "Model: Friendly model",
+      "Mode: On",
+      "Context 24k/128k",
+      "USD 0.00",
+      "Plan 1/2",
+      "1 file",
+      "F1 Help",
+    ])
+      expect(setup.footer()).toContain(text);
     expect(setup.captureCharFrame()).toContain("Reported diffs");
     expect(setup.captureCharFrame()).not.toContain("Ctrl+B hide sidebar");
     setup.resize(60, 24);
@@ -50,8 +113,16 @@ test("compact status summarizes sidebar data, adapts to width and preserves the 
     expect(setup.footer()).toContain("Mode: On");
     expect(setup.footer()).toEndWith("F1 Help");
     expect(setup.captureCharFrame()).not.toContain("Reported diffs");
-    for (const [cost, text] of [[null, "Cost: Not reported"], [{ currency: "EUR", amount: 0.5 }, "EUR 0.50"]] as const) {
-      applyUpdate(setup.controller.session, { sessionUpdate: "usage_update", used: 25000, size: 128000, cost });
+    for (const [cost, text] of [
+      [null, "Cost: Not reported"],
+      [{ currency: "EUR", amount: 0.5 }, "EUR 0.50"],
+    ] as const) {
+      applyUpdate(setup.controller.session, {
+        sessionUpdate: "usage_update",
+        used: 25000,
+        size: 128000,
+        cost,
+      });
       setup.controller.emit("change", setup.controller.snapshot());
       await setup.renderOnce();
       expect(setup.footer()).toContain("Ctx 25k/128k");
@@ -73,7 +144,9 @@ test("compact status summarizes sidebar data, adapts to width and preserves the 
       expect(setup.footer()).toEndWith("F1 Help");
       expect(Bun.stringWidth(setup.footer())).toBeLessThanOrEqual(width - 2);
     }
-  } finally { await setup.cleanup(); }
+  } finally {
+    await setup.cleanup();
+  }
 });
 
 test("floating help searches all shortcuts and closes without cancelling a turn or changing the draft", async () => {
@@ -107,11 +180,22 @@ test("floating help searches all shortcuts and closes without cancelling a turn 
     setup.controller.emit("change", setup.controller.snapshot());
     setup.mockInput.pressEnter();
     expect(setup.prompts).toEqual(["keep draft!"]);
-  } finally { await setup.cleanup(); }
+  } finally {
+    await setup.cleanup();
+  }
 });
 
 test("help uses configured alternatives, unbound actions, remapped navigation and narrow layouts", async () => {
-  const setup = await renderApp({ "app.help": ["alt+h", "f2"], "composer.submit": [], "composer.newline": ["enter"], "help.next": ["alt+j"], "app.cancel": ["alt+c"] }, 60);
+  const setup = await renderApp(
+    {
+      "app.help": ["alt+h", "f2"],
+      "composer.submit": [],
+      "composer.newline": ["enter"],
+      "help.next": ["alt+j"],
+      "app.cancel": ["alt+c"],
+    },
+    60,
+  );
   try {
     expect(setup.footer()).toEndWith("Alt+H Help");
     setup.mockInput.pressKey("F1");
@@ -140,7 +224,9 @@ test("help uses configured alternatives, unbound actions, remapped navigation an
     setup.mockInput.pressKey("F2");
     await setup.renderOnce();
     expect(setup.captureCharFrame()).not.toContain("Keyboard shortcuts");
-  } finally { await setup.cleanup(); }
+  } finally {
+    await setup.cleanup();
+  }
 });
 
 test("unbound help remains available in the palette and as a local slash command", async () => {
@@ -158,7 +244,9 @@ test("unbound help remains available in the palette and as a local slash command
     await setup.renderOnce();
     expect(setup.captureCharFrame()).toContain("Current context · Composer");
     expect(setup.prompts).toEqual([]);
-  } finally { await setup.cleanup(); }
+  } finally {
+    await setup.cleanup();
+  }
 });
 
 test("help preserves picker filtering, selection and focus", async () => {
@@ -184,13 +272,25 @@ test("help preserves picker filtering, selection and focus", async () => {
     await setup.mockInput.typeText("!");
     setup.mockInput.pressEnter();
     expect(setup.prompts).toEqual(["draft!"]);
-  } finally { await setup.cleanup(); }
+  } finally {
+    await setup.cleanup();
+  }
 });
 
 test("help suspends permissions and retains form text, choices and JSON drafts", async () => {
   const setup = await renderApp();
   try {
-    setup.controller.emit("change", { ...setup.controller.snapshot(), interaction: { id: "permission", title: "Allow?", options: [{ id: "no", name: "No" }, { id: "yes", name: "Yes" }] } });
+    setup.controller.emit("change", {
+      ...setup.controller.snapshot(),
+      interaction: {
+        id: "permission",
+        title: "Allow?",
+        options: [
+          { id: "no", name: "No" },
+          { id: "yes", name: "Yes" },
+        ],
+      },
+    });
     await setup.renderOnce();
     setup.mockInput.pressArrow("down");
     setup.mockInput.pressKey("F1");
@@ -203,9 +303,22 @@ test("help suspends permissions and retains form text, choices and JSON drafts",
     setup.mockInput.pressEnter();
     expect(setup.answers).toEqual([{ id: "yes", content: undefined }]);
 
-    setup.controller.emit("change", { ...setup.controller.snapshot(), interaction: { id: "form", title: "Questions", options: [], form: {
-      properties: { name: { type: "string", title: "Name" }, enabled: { type: "boolean", title: "Enabled" }, note: { type: "string", default: "ready" } }, required: ["name", "enabled", "note"],
-    } } });
+    setup.controller.emit("change", {
+      ...setup.controller.snapshot(),
+      interaction: {
+        id: "form",
+        title: "Questions",
+        options: [],
+        form: {
+          properties: {
+            name: { type: "string", title: "Name" },
+            enabled: { type: "boolean", title: "Enabled" },
+            note: { type: "string", default: "ready" },
+          },
+          required: ["name", "enabled", "note"],
+        },
+      },
+    });
     await setup.renderOnce();
     await setup.mockInput.typeText("answer");
     setup.mockInput.pressKey("F1");
@@ -235,8 +348,13 @@ test("help suspends permissions and retains form text, choices and JSON drafts",
     setup.mockInput.pressKey("ESCAPE");
     expect(setup.answers).toHaveLength(1);
     setup.mockInput.pressEnter({ ctrl: true });
-    expect(setup.answers).toEqual([{ id: "yes", content: undefined }, { id: "accept", content: { name: "answer!", enabled: false, note: "ready" } }]);
-  } finally { await setup.cleanup(); }
+    expect(setup.answers).toEqual([
+      { id: "yes", content: undefined },
+      { id: "accept", content: { name: "answer!", enabled: false, note: "ready" } },
+    ]);
+  } finally {
+    await setup.cleanup();
+  }
 });
 
 test("help shortcuts validate collisions in every supported context", () => {

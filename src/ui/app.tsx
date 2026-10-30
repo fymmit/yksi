@@ -26,9 +26,14 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const dimensions = useTerminalDimensions();
   const [state, setState] = createStore<Snapshot>(controller.snapshot());
   const initialTheme = controller.storage.setting<ThemeName>("theme", "dark");
-  const [themeName, setThemeName] = createSignal<ThemeName>(initialTheme in themes ? initialTheme : "dark");
+  const [themeName, setThemeName] = createSignal<ThemeName>(
+    initialTheme in themes ? initialTheme : "dark",
+  );
   const theme = () => themes[themeName()];
-  const styles = { dark: syntaxStyle(renderer, themes.dark), light: syntaxStyle(renderer, themes.light) };
+  const styles = {
+    dark: syntaxStyle(renderer, themes.dark),
+    light: syntaxStyle(renderer, themes.light),
+  };
   const [sidebar, setSidebar] = createSignal(controller.storage.setting("sidebar", true));
   const [expanded, setExpanded] = createSignal(false);
   const [thoughts, setThoughts] = createSignal(false);
@@ -38,7 +43,16 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const [palette, setPalette] = createSignal<{ title: string; choices: Choice[] }>();
   const [help, setHelp] = createSignal<KeyContext>();
   const [formContext, setFormContext] = createSignal<KeyContext>("form.text");
-  const showHelp = () => setHelp(state.interaction ? state.interaction.form ? formContext() : "permission" : palette() ? "picker" : "composer");
+  const showHelp = () =>
+    setHelp(
+      state.interaction
+        ? state.interaction.form
+          ? formContext()
+          : "permission"
+        : palette()
+          ? "picker"
+          : "composer",
+    );
   const [notice, setNotice] = createSignal("");
   let editor: TextareaRenderable | undefined;
   let scroll: ScrollBoxRenderable | undefined;
@@ -48,17 +62,27 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const busy = () => ["working", "connecting", "cancelling"].includes(state.status);
   const mode = createMemo(() => sessionMode(state.session));
   const run = (action: () => unknown) => {
-    try { void Promise.resolve(action()).catch(error => controller.report(error)); } catch (error) { controller.report(error); }
+    try {
+      void Promise.resolve(action()).catch(error => controller.report(error));
+    } catch (error) {
+      controller.report(error);
+    }
   };
-  const replaceDraft = (text: string) => { editor?.setText(text); editor?.gotoBufferEnd(); setDraft(text); };
+  const replaceDraft = (text: string) => {
+    editor?.setText(text);
+    editor?.gotoBufferEnd();
+    setDraft(text);
+  };
   const listener = (snapshot: Snapshot) => {
     const previousId = state.session.id;
     if (previousId !== snapshot.session.id) {
       setNotice("");
       drafts.set(previousId, { text: draft(), attachments: attachments() });
       const saved = drafts.get(snapshot.session.id);
-      replaceDraft(saved?.text ?? ""); setAttachments(saved?.attachments ?? []);
-      historyIndex = -1; setLimit(200);
+      replaceDraft(saved?.text ?? "");
+      setAttachments(saved?.attachments ?? []);
+      historyIndex = -1;
+      setLimit(200);
     }
     if (snapshot.interaction) setPalette(undefined);
     setState(reconcile(snapshot));
@@ -67,72 +91,219 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     controller.on("change", listener);
     if (props.autoConnect !== false) run(() => controller.open());
   });
-  onCleanup(() => { controller.off("change", listener); styles.dark.destroy(); styles.light.destroy(); });
+  onCleanup(() => {
+    controller.off("change", listener);
+    styles.dark.destroy();
+    styles.light.destroy();
+  });
 
-  const showAgents = () => setPalette({ title: "Choose agent · opens a new session", choices: Object.entries(controller.config.agents).map(([name, agent]) => ({ id: name, label: name, detail: `${agent.command} ${agent.args.join(" ")}`, run: () => controller.open(undefined, name) })) });
-  const showSessions = () => setPalette({ title: `Sessions · ${basename(controller.cwd)}`, choices: controller.storage.list(controller.cwd).map(session => ({ id: session.id, label: session.title, detail: `${session.agent} · ${new Date(session.updatedAt).toLocaleString()}`, run: () => session.id === state.session.id ? undefined : controller.open(session) })) });
+  const showAgents = () =>
+    setPalette({
+      title: "Choose agent · opens a new session",
+      choices: Object.entries(controller.config.agents).map(([name, agent]) => ({
+        id: name,
+        label: name,
+        detail: `${agent.command} ${agent.args.join(" ")}`,
+        run: () => controller.open(undefined, name),
+      })),
+    });
+  const showSessions = () =>
+    setPalette({
+      title: `Sessions · ${basename(controller.cwd)}`,
+      choices: controller.storage.list(controller.cwd).map(session => ({
+        id: session.id,
+        label: session.title,
+        detail: `${session.agent} · ${new Date(session.updatedAt).toLocaleString()}`,
+        run: () => (session.id === state.session.id ? undefined : controller.open(session)),
+      })),
+    });
   const showFiles = async () => {
     setNotice("Finding project files…");
     const files = await projectFiles(controller.cwd);
     setNotice("");
-    setPalette({ title: "Attach a text file", choices: files.map(path => ({ id: path, label: path, run: () => {
-      setAttachments(previous => [...new Set([...previous, path])]);
-      if (draft() === "@") replaceDraft("");
-    } })) });
+    setPalette({
+      title: "Attach a text file",
+      choices: files.map(path => ({
+        id: path,
+        label: path,
+        run: () => {
+          setAttachments(previous => [...new Set([...previous, path])]);
+          if (draft() === "@") replaceDraft("");
+        },
+      })),
+    });
   };
-  const showConfig = () => setPalette({ title: "Agent session settings", choices: [
-    ...state.session.configOptions.map(option => ({ id: option.id, label: option.name, detail: String(option.currentValue), run: () => {
-      if (option.type === "boolean") return controller.setConfig(option.id, !option.currentValue);
-      const values = option.options.flatMap(value => "options" in value ? value.options : [value]);
-      setPalette({ title: option.name, choices: values.map(value => ({ id: value.value, label: value.name, detail: value.description ?? undefined, run: () => controller.setConfig(option.id, value.value) })) });
-    } })),
-    ...(state.session.configOptions.length ? [] : state.session.modes?.availableModes ?? []).map(mode => ({ id: `mode:${mode.id}`, label: `Mode: ${mode.name}`, detail: mode.description ?? undefined, run: () => controller.setMode(mode.id) })),
-  ] });
-  const toggleSidebar = () => { setSidebar(value => !value); controller.storage.setSetting("sidebar", sidebar()); };
-  const toggleTheme = () => { setThemeName(name => name === "dark" ? "light" : "dark"); controller.storage.setSetting("theme", themeName()); };
-  const clientCommands = (): Choice[] => [
-    { id: "help", label: "Keyboard shortcuts", run: showHelp },
-    { id: "new", label: "New session", run: () => controller.open() },
-    { id: "sessions", label: "Switch session", run: showSessions },
-    { id: "agents", label: "Switch agent", run: showAgents },
-    { id: "config", label: "Model, mode and agent settings", detail: "advertised by the agent", run: showConfig },
-    { id: "cycle-mode", label: "Cycle mode", detail: "next agent mode", run: () => controller.cycleMode() },
-    { id: "usage", label: "Show session usage", detail: "last reported cost and context", run: () => { controller.clearError(); setNotice(usageSummary(state.session)); } },
-    { id: "files", label: "Attach file", run: showFiles },
-    { id: "clear-attachments", label: "Clear attachments", run: () => setAttachments([]) },
-    { id: "reconnect", label: "Reconnect current session", run: () => controller.open(state.session.remoteId ? controller.session : undefined) },
-    { id: "sidebar", label: "Toggle sidebar", run: toggleSidebar },
-    { id: "tools", label: "Expand / collapse tool details", run: () => setExpanded(value => !value) },
-    { id: "thoughts", label: "Show / hide reasoning", run: () => setThoughts(value => !value) },
-    { id: "theme", label: "Toggle light / dark theme", run: toggleTheme },
-    { id: "earlier", label: "Show earlier messages", run: () => setLimit(value => value + 200) },
-    { id: "export", label: "Export transcript to Markdown", run: async () => setNotice(`Exported ${await controller.exportTranscript()}`) },
-    { id: "paths", label: "Show configuration and data paths", run: () => setNotice(`Config: ${appPaths().config} · Data: ${appPaths().data}`) },
-    ...(controller.client?.info?.authMethods ?? []).filter(method => !("type" in method && method.type === "terminal")).map(method => ({ id: `auth:${method.id}`, label: `Authenticate: ${method.name}`, detail: method.description ?? undefined, run: () => controller.authenticate(method.id) })),
-    { id: "quit", label: "Quit", run: props.quit },
-  ].map(command => {
-    const id = `app.${command.id}` as KeyAction;
-    const shortcut = Object.hasOwn(keys.bindings, id) ? keys.label(id) : "";
-    return { ...command, detail: [shortcut, command.detail].filter(Boolean).join(" · ") || undefined };
-  });
-  const agentCommands = (): Choice[] => state.session.commands.map(command => ({ id: `agent:${command.name}`, label: `/${command.name}`, detail: `${command.description}${command.input?.hint ? ` · ${command.input.hint}` : ""}`, run: () => replaceDraft(`/${command.name} `) }));
-  const showCommands = () => setPalette({ title: "Command palette", choices: [...clientCommands(), ...agentCommands()] });
-  const completions = createMemo(() => draft().startsWith("/") && !draft().includes(" ") ? [...clientCommands().map(c => `/tui:${c.id}`), ...state.session.commands.map(c => `/${c.name}`)].filter(name => name.startsWith(draft())).slice(0, 5) : []);
+  const showConfig = () =>
+    setPalette({
+      title: "Agent session settings",
+      choices: [
+        ...state.session.configOptions.map(option => ({
+          id: option.id,
+          label: option.name,
+          detail: String(option.currentValue),
+          run: () => {
+            if (option.type === "boolean")
+              return controller.setConfig(option.id, !option.currentValue);
+            const values = option.options.flatMap(value =>
+              "options" in value ? value.options : [value],
+            );
+            setPalette({
+              title: option.name,
+              choices: values.map(value => ({
+                id: value.value,
+                label: value.name,
+                detail: value.description ?? undefined,
+                run: () => controller.setConfig(option.id, value.value),
+              })),
+            });
+          },
+        })),
+        ...(state.session.configOptions.length
+          ? []
+          : (state.session.modes?.availableModes ?? [])
+        ).map(mode => ({
+          id: `mode:${mode.id}`,
+          label: `Mode: ${mode.name}`,
+          detail: mode.description ?? undefined,
+          run: () => controller.setMode(mode.id),
+        })),
+      ],
+    });
+  const toggleSidebar = () => {
+    setSidebar(value => !value);
+    controller.storage.setSetting("sidebar", sidebar());
+  };
+  const toggleTheme = () => {
+    setThemeName(name => (name === "dark" ? "light" : "dark"));
+    controller.storage.setSetting("theme", themeName());
+  };
+  const clientCommands = (): Choice[] =>
+    [
+      { id: "help", label: "Keyboard shortcuts", run: showHelp },
+      { id: "new", label: "New session", run: () => controller.open() },
+      { id: "sessions", label: "Switch session", run: showSessions },
+      { id: "agents", label: "Switch agent", run: showAgents },
+      {
+        id: "config",
+        label: "Model, mode and agent settings",
+        detail: "advertised by the agent",
+        run: showConfig,
+      },
+      {
+        id: "cycle-mode",
+        label: "Cycle mode",
+        detail: "next agent mode",
+        run: () => controller.cycleMode(),
+      },
+      {
+        id: "usage",
+        label: "Show session usage",
+        detail: "last reported cost and context",
+        run: () => {
+          controller.clearError();
+          setNotice(usageSummary(state.session));
+        },
+      },
+      { id: "files", label: "Attach file", run: showFiles },
+      { id: "clear-attachments", label: "Clear attachments", run: () => setAttachments([]) },
+      {
+        id: "reconnect",
+        label: "Reconnect current session",
+        run: () => controller.open(state.session.remoteId ? controller.session : undefined),
+      },
+      { id: "sidebar", label: "Toggle sidebar", run: toggleSidebar },
+      {
+        id: "tools",
+        label: "Expand / collapse tool details",
+        run: () => setExpanded(value => !value),
+      },
+      { id: "thoughts", label: "Show / hide reasoning", run: () => setThoughts(value => !value) },
+      { id: "theme", label: "Toggle light / dark theme", run: toggleTheme },
+      { id: "earlier", label: "Show earlier messages", run: () => setLimit(value => value + 200) },
+      {
+        id: "export",
+        label: "Export transcript to Markdown",
+        run: async () => setNotice(`Exported ${await controller.exportTranscript()}`),
+      },
+      {
+        id: "paths",
+        label: "Show configuration and data paths",
+        run: () => setNotice(`Config: ${appPaths().config} · Data: ${appPaths().data}`),
+      },
+      ...(controller.client?.info?.authMethods ?? [])
+        .filter(method => !("type" in method && method.type === "terminal"))
+        .map(method => ({
+          id: `auth:${method.id}`,
+          label: `Authenticate: ${method.name}`,
+          detail: method.description ?? undefined,
+          run: () => controller.authenticate(method.id),
+        })),
+      { id: "quit", label: "Quit", run: props.quit },
+    ].map(command => {
+      const id = `app.${command.id}` as KeyAction;
+      const shortcut = Object.hasOwn(keys.bindings, id) ? keys.label(id) : "";
+      return {
+        ...command,
+        detail: [shortcut, command.detail].filter(Boolean).join(" · ") || undefined,
+      };
+    });
+  const agentCommands = (): Choice[] =>
+    state.session.commands.map(command => ({
+      id: `agent:${command.name}`,
+      label: `/${command.name}`,
+      detail: `${command.description}${command.input?.hint ? ` · ${command.input.hint}` : ""}`,
+      run: () => replaceDraft(`/${command.name} `),
+    }));
+  const showCommands = () =>
+    setPalette({ title: "Command palette", choices: [...clientCommands(), ...agentCommands()] });
+  const completions = createMemo(() =>
+    draft().startsWith("/") && !draft().includes(" ")
+      ? [
+          ...clientCommands().map(c => `/tui:${c.id}`),
+          ...state.session.commands.map(c => `/${c.name}`),
+        ]
+          .filter(name => name.startsWith(draft()))
+          .slice(0, 5)
+      : [],
+  );
   const submit = () => {
     // Key events can arrive in one terminal read; the editor is ahead of content-change signals.
     const text = (editor?.plainText ?? draft()).trim();
     if (!text && !attachments().length) return;
     if (text.startsWith("/tui:")) {
       const command = clientCommands().find(c => `/tui:${c.id}` === text);
-      if (!command) { controller.report(`Unknown client command. Open the command palette: ${hint("app.commands", "commands")}.`); return; }
-      replaceDraft(""); run(command.run); return;
+      if (!command) {
+        controller.report(
+          `Unknown client command. Open the command palette: ${hint("app.commands", "commands")}.`,
+        );
+        return;
+      }
+      replaceDraft("");
+      run(command.run);
+      return;
     }
-    if (text.startsWith("/") && !state.session.commands.some(command => text === `/${command.name}` || text.startsWith(`/${command.name} `))) {
-      controller.report(`This slash command was not advertised by the agent. ${hint("composer.complete", "complete")} · ${hint("app.commands", "commands")}.`); return;
+    if (
+      text.startsWith("/") &&
+      !state.session.commands.some(
+        command => text === `/${command.name}` || text.startsWith(`/${command.name} `),
+      )
+    ) {
+      controller.report(
+        `This slash command was not advertised by the agent. ${hint("composer.complete", "complete")} · ${hint("app.commands", "commands")}.`,
+      );
+      return;
     }
-    if (state.status !== "ready") { controller.report(`The session is not ready. Reconnect or create a new session from the command palette (${hint("app.commands", "commands")}).`); return; }
+    if (state.status !== "ready") {
+      controller.report(
+        `The session is not ready. Reconnect or create a new session from the command palette (${hint("app.commands", "commands")}).`,
+      );
+      return;
+    }
     const files = attachments();
-    replaceDraft(""); setAttachments([]); historyIndex = -1; setNotice("");
+    replaceDraft("");
+    setAttachments([]);
+    historyIndex = -1;
+    setNotice("");
     scroll?.scrollTo(Infinity);
     run(() => controller.send(text, files));
   };
@@ -141,13 +312,26 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     if (key.defaultPrevented) return;
     if (keys.matches("app.quit", key) || keys.matches("app.interrupt", key)) {
       if (!consumeKey(key)) return;
-      if (keys.matches("app.interrupt", key) && busy()) run(() => controller.cancel()); else props.quit();
+      if (keys.matches("app.interrupt", key) && busy()) run(() => controller.cancel());
+      else props.quit();
       return;
     }
-    if (keys.matches("app.help", key)) { if (consumeKey(key)) { if (help()) setHelp(undefined); else showHelp(); } return; }
+    if (keys.matches("app.help", key)) {
+      if (consumeKey(key)) {
+        if (help()) setHelp(undefined);
+        else showHelp();
+      }
+      return;
+    }
     if (help()) return;
-    if (keys.matches("app.tools", key)) { if (consumeKey(key)) setExpanded(value => !value); return; }
-    if (!state.interaction?.form && (keys.matches("app.scrollUp", key) || keys.matches("app.scrollDown", key))) {
+    if (keys.matches("app.tools", key)) {
+      if (consumeKey(key)) setExpanded(value => !value);
+      return;
+    }
+    if (
+      !state.interaction?.form &&
+      (keys.matches("app.scrollUp", key) || keys.matches("app.scrollDown", key))
+    ) {
       if (consumeKey(key, true)) scroll?.scrollBy(keys.matches("app.scrollUp", key) ? -10 : 10);
       return;
     }
@@ -156,83 +340,297 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       if (!consumeKey(key)) return;
       if (palette()) setPalette(undefined);
       else if (busy()) run(() => controller.cancel());
-      else { controller.clearError(); setNotice(""); }
+      else {
+        controller.clearError();
+        setNotice("");
+      }
       return;
     }
     if (palette()) return;
-    if (keys.matches("app.commands", key)) { if (consumeKey(key)) showCommands(); return; }
+    if (keys.matches("app.commands", key)) {
+      if (consumeKey(key)) showCommands();
+      return;
+    }
     const command = clientCommands().find(command => {
       const id = `app.${command.id}` as KeyAction;
       return Object.hasOwn(keys.bindings, id) && keys.matches(id, key);
     });
-    if (command) { if (consumeKey(key)) run(command.run); return; }
-    if (keys.matches("composer.submit", key)) { if (consumeKey(key)) submit(); return; }
-    if (keys.matches("composer.newline", key)) { if (consumeKey(key, true)) editor?.newLine(); return; }
+    if (command) {
+      if (consumeKey(key)) run(command.run);
+      return;
+    }
+    if (keys.matches("composer.submit", key)) {
+      if (consumeKey(key)) submit();
+      return;
+    }
+    if (keys.matches("composer.newline", key)) {
+      if (consumeKey(key, true)) editor?.newLine();
+      return;
+    }
     if (keys.matches("composer.complete", key)) {
       if (!consumeKey(key)) return;
       const prefix = editor?.plainText ?? draft();
       if (prefix.startsWith("/")) {
-        setPalette({ title: "Complete command", choices: [
-          ...clientCommands().map(c => ({ ...c, label: `/tui:${c.id}`, run: () => replaceDraft(`/tui:${c.id}`) })), ...agentCommands(),
-        ].filter(c => c.label.startsWith(prefix)) });
+        setPalette({
+          title: "Complete command",
+          choices: [
+            ...clientCommands().map(c => ({
+              ...c,
+              label: `/tui:${c.id}`,
+              run: () => replaceDraft(`/tui:${c.id}`),
+            })),
+            ...agentCommands(),
+          ].filter(c => c.label.startsWith(prefix)),
+        });
       } else if (prefix.startsWith("@")) run(showFiles);
       return;
     }
-    if (keys.matches("composer.historyPrevious", key) || keys.matches("composer.historyNext", key)) {
+    if (
+      keys.matches("composer.historyPrevious", key) ||
+      keys.matches("composer.historyNext", key)
+    ) {
       if (!consumeKey(key, true)) return;
-      const history = state.session.items.filter(item => item.type === "message" && item.role === "user").map(item => item.type === "message" ? item.text : "").reverse();
+      const history = state.session.items
+        .filter(item => item.type === "message" && item.role === "user")
+        .map(item => (item.type === "message" ? item.text : ""))
+        .reverse();
       if (historyIndex === -1) savedDraft = editor?.plainText ?? draft();
-      historyIndex = Math.max(-1, Math.min(history.length - 1, historyIndex + (keys.matches("composer.historyPrevious", key) ? 1 : -1)));
-      replaceDraft(historyIndex === -1 ? savedDraft : history[historyIndex] ?? "");
+      historyIndex = Math.max(
+        -1,
+        Math.min(
+          history.length - 1,
+          historyIndex + (keys.matches("composer.historyPrevious", key) ? 1 : -1),
+        ),
+      );
+      replaceDraft(historyIndex === -1 ? savedDraft : (history[historyIndex] ?? ""));
       return;
     }
     suppressEditorFallback(key);
   });
 
-  return <box width="100%" height="100%" flexDirection="column" backgroundColor={theme().bg}>
-    <box height={2} flexShrink={0} paddingX={1} justifyContent="space-between" flexDirection="row">
-      <text fg={theme().accent}>ACP TUI / {basename(state.session.cwd)}</text>
-      <text fg={theme().muted}>{state.agentName ?? state.session.agent} · {state.status}</text>
-    </box>
-    <box flexGrow={1} minHeight={0} flexDirection="row">
-      <scrollbox ref={scroll} flexGrow={1} minWidth={0} scrollY stickyScroll stickyStart="bottom" contentOptions={{ paddingX: 1 }}>
-        <Show when={!state.session.items.length}>
-          <box flexDirection="column" padding={2} gap={1}>
-            <text fg={theme().accent}>What would you like to build?</text>
-            <text fg={theme().muted}>One interface for your coding agents.</text>
-            <text fg={theme().text}>Type a prompt below. {hint("app.commands", "commands")} · {hint("app.agents", "agents")}</text>
-            <Show when={state.session.agent === "demo"}><text fg={theme().warning}>Offline demo · simulated edits · try /help, /question or /slow</text></Show>
-          </box>
-        </Show>
-        <Show when={state.session.items.length > limit()}><text fg={theme().muted} onMouseDown={() => setLimit(value => value + 200)}>Earlier messages hidden · “Show earlier messages” in the command palette ({hint("app.commands", "commands")})</text></Show>
-        <For each={state.session.items.slice(-limit())}>{item => <TimelineEntry item={item} theme={theme()} syntax={styles[themeName()]} expanded={expanded()} thoughts={thoughts()} streaming={state.status === "working" && item.id === state.session.items.at(-1)?.id} terminals={state.terminalOutput} />}</For>
-        <Show when={state.status === "working" || state.status === "cancelling"}><text fg={theme().accent}>{state.status === "working" ? `Working… · ${hint("app.cancel", "to cancel")}` : `Cancelling… · ${hint("app.cancel", "to disconnect")}`}</text></Show>
-      </scrollbox>
-      <Show when={sidebar() && dimensions().width >= 100}>
-        <scrollbox width={29} flexShrink={0} border={["left"]} borderColor={theme().border} paddingX={1} scrollY>
-          <text fg={theme().accent}>{state.session.title}</text>
-          <text fg={theme().muted}>{state.session.agent}</text>
-          <For each={state.session.configOptions}>{option => <text fg={theme().muted}>{option.name}: {String(option.currentValue)}</text>}</For>
-          <Show when={!state.session.configOptions.length && state.session.modes}><text fg={theme().muted}>Mode: {state.session.modes?.currentModeId}</text></Show>
-          <Show when={state.session.usage}><text fg={theme().muted}>Context: {state.session.usage?.used.toLocaleString()} / {state.session.usage?.size.toLocaleString()}</text></Show>
-          <Show when={state.session.usage}><text fg={theme().muted}>Reported cost:{"\n"}{formatCost(state.session.usage?.cost)}</text></Show>
-          <Show when={state.session.plan.length}><text fg={theme().accent} marginTop={1}>Plan</text></Show>
-          <For each={state.session.plan}>{entry => <text fg={entry.status === "completed" ? theme().muted : theme().text}>{entry.status === "completed" ? "✓" : entry.status === "in_progress" ? "›" : "○"} {entry.content}</text>}</For>
-          <Show when={changedFiles(state.session).length}><text fg={theme().accent} marginTop={1}>Reported diffs</text></Show>
-          <For each={changedFiles(state.session)}>{path => <text fg={theme().muted}>{relative(state.session.cwd, path)}</text>}</For>
+  return (
+    <box width="100%" height="100%" flexDirection="column" backgroundColor={theme().bg}>
+      <box
+        height={2}
+        flexShrink={0}
+        paddingX={1}
+        justifyContent="space-between"
+        flexDirection="row"
+      >
+        <text fg={theme().accent}>ACP TUI / {basename(state.session.cwd)}</text>
+        <text fg={theme().muted}>
+          {state.agentName ?? state.session.agent} · {state.status}
+        </text>
+      </box>
+      <box flexGrow={1} minHeight={0} flexDirection="row">
+        <scrollbox
+          ref={scroll}
+          flexGrow={1}
+          minWidth={0}
+          scrollY
+          stickyScroll
+          stickyStart="bottom"
+          contentOptions={{ paddingX: 1 }}
+        >
+          <Show when={!state.session.items.length}>
+            <box flexDirection="column" padding={2} gap={1}>
+              <text fg={theme().accent}>What would you like to build?</text>
+              <text fg={theme().muted}>One interface for your coding agents.</text>
+              <text fg={theme().text}>
+                Type a prompt below. {hint("app.commands", "commands")} ·{" "}
+                {hint("app.agents", "agents")}
+              </text>
+              <Show when={state.session.agent === "demo"}>
+                <text fg={theme().warning}>
+                  Offline demo · simulated edits · try /help, /question or /slow
+                </text>
+              </Show>
+            </box>
+          </Show>
+          <Show when={state.session.items.length > limit()}>
+            <text fg={theme().muted} onMouseDown={() => setLimit(value => value + 200)}>
+              Earlier messages hidden · “Show earlier messages” in the command palette (
+              {hint("app.commands", "commands")})
+            </text>
+          </Show>
+          <For each={state.session.items.slice(-limit())}>
+            {item => (
+              <TimelineEntry
+                item={item}
+                theme={theme()}
+                syntax={styles[themeName()]}
+                expanded={expanded()}
+                thoughts={thoughts()}
+                streaming={state.status === "working" && item.id === state.session.items.at(-1)?.id}
+                terminals={state.terminalOutput}
+              />
+            )}
+          </For>
+          <Show when={state.status === "working" || state.status === "cancelling"}>
+            <text fg={theme().accent}>
+              {state.status === "working"
+                ? `Working… · ${hint("app.cancel", "to cancel")}`
+                : `Cancelling… · ${hint("app.cancel", "to disconnect")}`}
+            </text>
+          </Show>
         </scrollbox>
+        <Show when={sidebar() && dimensions().width >= 100}>
+          <scrollbox
+            width={29}
+            flexShrink={0}
+            border={["left"]}
+            borderColor={theme().border}
+            paddingX={1}
+            scrollY
+          >
+            <text fg={theme().accent}>{state.session.title}</text>
+            <text fg={theme().muted}>{state.session.agent}</text>
+            <For each={state.session.configOptions}>
+              {option => (
+                <text fg={theme().muted}>
+                  {option.name}: {String(option.currentValue)}
+                </text>
+              )}
+            </For>
+            <Show when={!state.session.configOptions.length && state.session.modes}>
+              <text fg={theme().muted}>Mode: {state.session.modes?.currentModeId}</text>
+            </Show>
+            <Show when={state.session.usage}>
+              <text fg={theme().muted}>
+                Context: {state.session.usage?.used.toLocaleString()} /{" "}
+                {state.session.usage?.size.toLocaleString()}
+              </text>
+            </Show>
+            <Show when={state.session.usage}>
+              <text fg={theme().muted}>
+                Reported cost:{"\n"}
+                {formatCost(state.session.usage?.cost)}
+              </text>
+            </Show>
+            <Show when={state.session.plan.length}>
+              <text fg={theme().accent} marginTop={1}>
+                Plan
+              </text>
+            </Show>
+            <For each={state.session.plan}>
+              {entry => (
+                <text fg={entry.status === "completed" ? theme().muted : theme().text}>
+                  {entry.status === "completed" ? "✓" : entry.status === "in_progress" ? "›" : "○"}{" "}
+                  {entry.content}
+                </text>
+              )}
+            </For>
+            <Show when={changedFiles(state.session).length}>
+              <text fg={theme().accent} marginTop={1}>
+                Reported diffs
+              </text>
+            </Show>
+            <For each={changedFiles(state.session)}>
+              {path => <text fg={theme().muted}>{relative(state.session.cwd, path)}</text>}
+            </For>
+          </scrollbox>
+        </Show>
+      </box>
+      <Show when={state.error || notice()}>
+        <text
+          fg={state.error ? theme().error : theme().muted}
+          paddingX={1}
+          maxHeight={3}
+          flexShrink={0}
+        >
+          {state.error ?? notice()}
+        </text>
+      </Show>
+      <Show when={palette()} keyed>
+        {menu => (
+          <Picker
+            title={menu.title}
+            choices={menu.choices}
+            theme={theme()}
+            keys={keys}
+            active={!help()}
+            height={dimensions().height}
+            close={() => setPalette(undefined)}
+            error={error => controller.report(error)}
+          />
+        )}
+      </Show>
+      <Show when={state.interaction} keyed>
+        {interaction => (
+          <InteractionView
+            interaction={interaction}
+            theme={theme()}
+            keys={keys}
+            active={!help()}
+            onContext={setFormContext}
+            answer={(id, content) => controller.answer(id, content)}
+          />
+        )}
+      </Show>
+      <box
+        border
+        borderColor={busy() ? theme().accent : theme().border}
+        backgroundColor={theme().panel}
+        flexDirection="column"
+        paddingX={1}
+        flexShrink={0}
+      >
+        <Show when={mode()}>
+          {current => (
+            <text fg={theme().accent} maxHeight={1}>
+              {current().name}:{" "}
+              {current().options.find(option => option.value === current().currentValue)?.name ??
+                String(current().currentValue)}
+              {current().options.length > 1 ? ` · ${hint("app.cycle-mode", "cycle mode")}` : ""}
+            </text>
+          )}
+        </Show>
+        <Show when={attachments().length}>
+          <text fg={theme().accent} maxHeight={2}>
+            Attached: {attachments().join(", ")}
+          </text>
+        </Show>
+        <textarea
+          ref={editor}
+          focused={!help() && !palette() && !state.interaction}
+          height={Math.min(5, Math.max(2, draft().split("\n").length))}
+          placeholder={
+            busy()
+              ? "Compose your next message…"
+              : `Ask anything · / commands · @ then ${hint("composer.complete", "to attach a file")}`
+          }
+          textColor={theme().text}
+          focusedTextColor={theme().text}
+          backgroundColor={theme().panel}
+          focusedBackgroundColor={theme().panel}
+          cursorColor={theme().accent}
+          onContentChange={() => setDraft(editor?.plainText ?? "")}
+        />
+        <Show when={completions().length}>
+          <text fg={theme().muted} maxHeight={1}>
+            {completions().join("  ")} · {hint("composer.complete", "complete")}
+          </text>
+        </Show>
+      </box>
+      <StatusBar
+        session={state.session}
+        width={dimensions().width}
+        theme={theme()}
+        keys={keys}
+        help={() => (help() ? setHelp(undefined) : showHelp())}
+      />
+      <Show when={help()}>
+        {context => (
+          <KeyboardHelp
+            context={context()}
+            keys={keys}
+            theme={theme()}
+            width={dimensions().width}
+            height={dimensions().height}
+            close={() => setHelp(undefined)}
+          />
+        )}
       </Show>
     </box>
-    <Show when={state.error || notice()}><text fg={state.error ? theme().error : theme().muted} paddingX={1} maxHeight={3} flexShrink={0}>{state.error ?? notice()}</text></Show>
-    <Show when={palette()} keyed>{menu => <Picker title={menu.title} choices={menu.choices} theme={theme()} keys={keys} active={!help()} height={dimensions().height} close={() => setPalette(undefined)} error={error => controller.report(error)} />}</Show>
-    <Show when={state.interaction} keyed>{interaction => <InteractionView interaction={interaction} theme={theme()} keys={keys} active={!help()} onContext={setFormContext} answer={(id, content) => controller.answer(id, content)} />}</Show>
-    <box border borderColor={busy() ? theme().accent : theme().border} backgroundColor={theme().panel} flexDirection="column" paddingX={1} flexShrink={0}>
-      <Show when={mode()}>{current => <text fg={theme().accent} maxHeight={1}>{current().name}: {current().options.find(option => option.value === current().currentValue)?.name ?? String(current().currentValue)}{current().options.length > 1 ? ` · ${hint("app.cycle-mode", "cycle mode")}` : ""}</text>}</Show>
-      <Show when={attachments().length}><text fg={theme().accent} maxHeight={2}>Attached: {attachments().join(", ")}</text></Show>
-      <textarea ref={editor} focused={!help() && !palette() && !state.interaction} height={Math.min(5, Math.max(2, draft().split("\n").length))} placeholder={busy() ? "Compose your next message…" : `Ask anything · / commands · @ then ${hint("composer.complete", "to attach a file")}`} textColor={theme().text} focusedTextColor={theme().text} backgroundColor={theme().panel} focusedBackgroundColor={theme().panel} cursorColor={theme().accent} onContentChange={() => setDraft(editor?.plainText ?? "")} />
-      <Show when={completions().length}><text fg={theme().muted} maxHeight={1}>{completions().join("  ")} · {hint("composer.complete", "complete")}</text></Show>
-    </box>
-    <StatusBar session={state.session} width={dimensions().width} theme={theme()} keys={keys} help={() => help() ? setHelp(undefined) : showHelp()} />
-    <Show when={help()}>{context => <KeyboardHelp context={context()} keys={keys} theme={theme()} width={dimensions().width} height={dimensions().height} close={() => setHelp(undefined)} />}</Show>
-  </box>;
+  );
 }

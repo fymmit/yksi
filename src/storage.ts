@@ -14,17 +14,27 @@ export class Storage {
       PRAGMA user_version=1;`);
   }
   save(session: Session) {
-    this.db.query("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?)").run(session.id, session.cwd, session.updatedAt, JSON.stringify(session));
+    this.db
+      .query("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?)")
+      .run(session.id, session.cwd, session.updatedAt, JSON.stringify(session));
   }
   list(cwd: string): Session[] {
-    return (this.db.query("SELECT data FROM sessions WHERE cwd = ? ORDER BY updated_at DESC LIMIT 100").all(cwd) as { data: string }[]).map(row => JSON.parse(row.data));
+    return (
+      this.db
+        .query("SELECT data FROM sessions WHERE cwd = ? ORDER BY updated_at DESC LIMIT 100")
+        .all(cwd) as { data: string }[]
+    ).map(row => JSON.parse(row.data));
   }
   setting<T>(key: string, fallback: T): T {
-    const row = this.db.query("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | null;
+    const row = this.db.query("SELECT value FROM settings WHERE key = ?").get(key) as {
+      value: string;
+    } | null;
     return row ? JSON.parse(row.value) : fallback;
   }
   setSetting(key: string, value: unknown) {
     this.db.query("INSERT OR REPLACE INTO settings VALUES (?, ?)").run(key, JSON.stringify(value));
   }
-  close() { this.db.close(); }
+  close() {
+    this.db.close();
+  }
 }

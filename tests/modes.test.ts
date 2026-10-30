@@ -8,9 +8,24 @@ import { newSession } from "../src/state";
 
 function setup(env: Record<string, string> = {}) {
   const storage = new Storage(":memory:");
-  const agent = { ...demoAgent(), args: [resolve(import.meta.dir, "fixtures/modes-agent.ts")], env };
-  const controller = new Controller({ defaultAgent: "test", agents: { test: agent } }, storage, resolve(import.meta.dir, ".."), "test");
-  return { controller, dispose: () => { controller.dispose(); storage.close(); } };
+  const agent = {
+    ...demoAgent(),
+    args: [resolve(import.meta.dir, "fixtures/modes-agent.ts")],
+    env,
+  };
+  const controller = new Controller(
+    { defaultAgent: "test", agents: { test: agent } },
+    storage,
+    resolve(import.meta.dir, ".."),
+    "test",
+  );
+  return {
+    controller,
+    dispose: () => {
+      controller.dispose();
+      storage.close();
+    },
+  };
 }
 
 test("mode discovery uses semantic categories and ignores legacy modes when config options exist", () => {
@@ -18,33 +33,38 @@ test("mode discovery uses semantic categories and ignores legacy modes when conf
   expect(sessionMode(session)).toBeUndefined();
   session.modes = { currentModeId: "plan", availableModes: [{ id: "plan", name: "Plan" }] };
   expect(sessionMode(session)?.currentValue).toBe("plan");
-  session.configOptions = [{ id: "mode", name: "Mode", type: "select", currentValue: "ask", options: [] }];
+  session.configOptions = [
+    { id: "mode", name: "Mode", type: "select", currentValue: "ask", options: [] },
+  ];
   expect(sessionMode(session)).toBeUndefined();
   session.configOptions[0]!.category = "_custom";
   expect(sessionMode(session)).toBeUndefined();
 });
 
-for (const api of ["config", "legacy"]) test(`${api} modes cycle, wrap, and follow agent-initiated changes`, async () => {
-  const { controller, dispose } = setup({ MODE_API: api });
-  try {
-    await controller.open();
-    expect(sessionMode(controller.session)?.currentValue).toBe("ask");
-    await controller.cycleMode();
-    expect(sessionMode(controller.session)?.currentValue).toBe("plan");
-    await controller.cycleMode();
-    expect(sessionMode(controller.session)?.currentValue).toBe("code");
-    await controller.cycleMode();
-    expect(sessionMode(controller.session)?.currentValue).toBe("ask");
-    if (api === "config") {
-      expect(controller.session.configOptions[0]?.currentValue).toBe("3");
-      expect(controller.session.configOptions[2]?.currentValue).toBe("other");
+for (const api of ["config", "legacy"])
+  test(`${api} modes cycle, wrap, and follow agent-initiated changes`, async () => {
+    const { controller, dispose } = setup({ MODE_API: api });
+    try {
+      await controller.open();
+      expect(sessionMode(controller.session)?.currentValue).toBe("ask");
+      await controller.cycleMode();
+      expect(sessionMode(controller.session)?.currentValue).toBe("plan");
+      await controller.cycleMode();
+      expect(sessionMode(controller.session)?.currentValue).toBe("code");
+      await controller.cycleMode();
+      expect(sessionMode(controller.session)?.currentValue).toBe("ask");
+      if (api === "config") {
+        expect(controller.session.configOptions[0]?.currentValue).toBe("3");
+        expect(controller.session.configOptions[2]?.currentValue).toBe("other");
+      }
+      await controller.send("change mode");
+      expect(sessionMode(controller.session)?.currentValue).toBe("code");
+      await controller.cycleMode();
+      expect(sessionMode(controller.session)?.currentValue).toBe("ask");
+    } finally {
+      dispose();
     }
-    await controller.send("change mode");
-    expect(sessionMode(controller.session)?.currentValue).toBe("code");
-    await controller.cycleMode();
-    expect(sessionMode(controller.session)?.currentValue).toBe("ask");
-  } finally { dispose(); }
-});
+  });
 
 test("boolean mode selectors send typed ACP requests", async () => {
   const { controller, dispose } = setup({ MODE_API: "boolean" });
@@ -54,7 +74,9 @@ test("boolean mode selectors send typed ACP requests", async () => {
     expect(sessionMode(controller.session)?.currentValue).toBe(true);
     await controller.cycleMode();
     expect(sessionMode(controller.session)?.currentValue).toBe(false);
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("rapid mode presses wait for confirmation and single-choice selectors do not send changes", async () => {
@@ -64,10 +86,21 @@ test("rapid mode presses wait for confirmation and single-choice selectors do no
     await Promise.all([controller.cycleMode(), controller.cycleMode(), controller.cycleMode()]);
     expect(controller.session.configOptions[0]?.currentValue).toBe("1");
     expect(sessionMode(controller.session)?.currentValue).toBe("plan");
-    controller.session.configOptions = [{ id: "single", name: "Mode", category: "mode", type: "select", currentValue: "only", options: [{ value: "only", name: "Only" }] }];
+    controller.session.configOptions = [
+      {
+        id: "single",
+        name: "Mode",
+        category: "mode",
+        type: "select",
+        currentValue: "only",
+        options: [{ value: "only", name: "Only" }],
+      },
+    ];
     await controller.cycleMode(); // The fixture rejects any request to this selector.
     expect(sessionMode(controller.session)?.currentValue).toBe("only");
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("rejected mode changes preserve the confirmed value and can be retried", async () => {
@@ -82,7 +115,9 @@ test("rejected mode changes preserve the confirmed value and can be retried", as
     await expect(controller.cycleMode()).rejects.toThrow("Wait for the current operation");
     controller.status = "disconnected";
     await expect(controller.cycleMode()).rejects.toThrow("Wait for the current operation");
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
 test("switching sessions discards in-flight setting results and releases the new session's controls", async () => {
@@ -96,34 +131,40 @@ test("switching sessions discards in-flight setting results and releases the new
     expect(sessionMode(controller.session)?.currentValue).toBe("ask");
     await controller.cycleMode();
     expect(sessionMode(controller.session)?.currentValue).toBe("plan");
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });
 
-for (const api of ["config", "legacy"]) test(`late successful ${api} mode responses cannot mutate a replaced session`, async () => {
-  const { controller, dispose } = setup({ MODE_API: api });
-  const arrived = Promise.withResolvers<void>();
-  const release = Promise.withResolvers<void>();
-  try {
-    await controller.open();
-    const previous = controller.session;
-    controller.client!.withTimeout = async <T>(promise: Promise<T>) => {
-      const result = await promise;
-      arrived.resolve();
-      await release.promise;
-      return result;
-    };
-    const changing = controller.cycleMode();
-    await arrived.promise;
-    await controller.open();
-    release.resolve();
-    await changing;
-    expect(sessionMode(previous)?.currentValue).toBe("ask");
-    expect(sessionMode(controller.session)?.currentValue).toBe("ask");
-    expect(controller.error).toBeUndefined();
-    await controller.cycleMode();
-    expect(sessionMode(controller.session)?.currentValue).toBe("plan");
-  } finally { release.resolve(); dispose(); }
-});
+for (const api of ["config", "legacy"])
+  test(`late successful ${api} mode responses cannot mutate a replaced session`, async () => {
+    const { controller, dispose } = setup({ MODE_API: api });
+    const arrived = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    try {
+      await controller.open();
+      const previous = controller.session;
+      controller.client!.withTimeout = async <T>(promise: Promise<T>) => {
+        const result = await promise;
+        arrived.resolve();
+        await release.promise;
+        return result;
+      };
+      const changing = controller.cycleMode();
+      await arrived.promise;
+      await controller.open();
+      release.resolve();
+      await changing;
+      expect(sessionMode(previous)?.currentValue).toBe("ask");
+      expect(sessionMode(controller.session)?.currentValue).toBe("ask");
+      expect(controller.error).toBeUndefined();
+      await controller.cycleMode();
+      expect(sessionMode(controller.session)?.currentValue).toBe("plan");
+    } finally {
+      release.resolve();
+      dispose();
+    }
+  });
 
 test("missing and empty selectors report unavailability; an unknown current value starts at the first choice", async () => {
   const { controller, dispose } = setup();
@@ -133,7 +174,18 @@ test("missing and empty selectors report unavailability; an unknown current valu
     controller.session.configOptions[1]!.currentValue = "removed";
     await controller.cycleMode();
     expect(sessionMode(controller.session)?.currentValue).toBe("ask");
-    controller.session.configOptions = [{ id: "empty", name: "Mode", category: "mode", type: "select", currentValue: "", options: [] }];
+    controller.session.configOptions = [
+      {
+        id: "empty",
+        name: "Mode",
+        category: "mode",
+        type: "select",
+        currentValue: "",
+        options: [],
+      },
+    ];
     await expect(controller.cycleMode()).rejects.toThrow("does not advertise");
-  } finally { dispose(); }
+  } finally {
+    dispose();
+  }
 });

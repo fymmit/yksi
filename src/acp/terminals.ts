@@ -13,19 +13,35 @@ type Terminal = {
 
 export class Terminals {
   private terminals = new Map<string, Terminal>();
-  constructor(private cwd: string, private onOutput: (id: string, output: string) => void) {}
+  constructor(
+    private cwd: string,
+    private onOutput: (id: string, output: string) => void,
+  ) {}
 
   create(params: acp.CreateTerminalRequest): acp.CreateTerminalResponse {
-    if (params.cwd && !isAbsolute(params.cwd)) throw new Error("ACP working directories must be absolute");
+    if (params.cwd && !isAbsolute(params.cwd))
+      throw new Error("ACP working directories must be absolute");
     const child = spawn(params.command, params.args ?? [], {
       cwd: params.cwd ?? this.cwd,
-      env: { ...process.env, ...Object.fromEntries((params.env ?? []).map(v => [v.name, v.value])) },
-      stdio: "pipe", detached: process.platform !== "win32",
+      env: {
+        ...process.env,
+        ...Object.fromEntries((params.env ?? []).map(v => [v.name, v.value])),
+      },
+      stdio: "pipe",
+      detached: process.platform !== "win32",
     });
     const id = crypto.randomUUID();
     const limit = Math.max(0, Math.min(params.outputByteLimit ?? 128 * 1024, 1024 * 1024));
     let finish!: (status: acp.TerminalExitStatus) => void;
-    const terminal: Terminal = { process: child, sessionId: params.sessionId, output: "", truncated: false, exited: new Promise(resolve => { finish = resolve; }) };
+    const terminal: Terminal = {
+      process: child,
+      sessionId: params.sessionId,
+      output: "",
+      truncated: false,
+      exited: new Promise(resolve => {
+        finish = resolve;
+      }),
+    };
     const append = (text: string) => {
       const bytes = Buffer.from(terminal.output + text);
       let start = Math.max(0, bytes.length - limit);
@@ -39,7 +55,11 @@ export class Terminals {
     child.stdout.setEncoding("utf8").on("data", append);
     child.stderr.setEncoding("utf8").on("data", append);
     child.stdin.end();
-    child.on("error", error => { append(error.message); terminal.exitStatus = { exitCode: 1 }; finish(terminal.exitStatus); });
+    child.on("error", error => {
+      append(error.message);
+      terminal.exitStatus = { exitCode: 1 };
+      finish(terminal.exitStatus);
+    });
     child.on("close", (code, signal) => {
       terminal.exitStatus ??= { exitCode: code, signal };
       finish(terminal.exitStatus);
@@ -50,15 +70,21 @@ export class Terminals {
   }
   private get(params: { sessionId: string; terminalId: string }) {
     const terminal = this.terminals.get(params.terminalId);
-    if (!terminal || terminal.sessionId !== params.sessionId) throw new Error("Unknown terminal for session");
+    if (!terminal || terminal.sessionId !== params.sessionId)
+      throw new Error("Unknown terminal for session");
     return terminal;
   }
   output(params: acp.TerminalOutputRequest): acp.TerminalOutputResponse {
     const { output, truncated, exitStatus } = this.get(params);
     return { output, truncated, exitStatus };
   }
-  wait(params: acp.WaitForTerminalExitRequest) { return this.get(params).exited; }
-  kill(params: acp.KillTerminalRequest) { stopProcess(this.get(params).process); return {}; }
+  wait(params: acp.WaitForTerminalExitRequest) {
+    return this.get(params).exited;
+  }
+  kill(params: acp.KillTerminalRequest) {
+    stopProcess(this.get(params).process);
+    return {};
+  }
   release(params: acp.ReleaseTerminalRequest) {
     this.kill(params);
     this.terminals.delete(params.terminalId);
@@ -76,7 +102,9 @@ export function stopProcess(child: ChildProcessWithoutNullStreams) {
     try {
       if (process.platform !== "win32") process.kill(-child.pid!, signal);
       else if (child.exitCode === null) child.kill(signal);
-    } catch { /* The process group has already exited. */ }
+    } catch {
+      /* The process group has already exited. */
+    }
   };
   kill("SIGTERM");
   const timer = setTimeout(() => kill("SIGKILL"), 1000);
