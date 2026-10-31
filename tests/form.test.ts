@@ -5,6 +5,7 @@ import {
   questionChoices,
   questionState,
   sameAnswer,
+  editQuestion,
 } from "../src/ui/form-state";
 
 test("form model honors nullable constraints, defaults, types and optional omission", () => {
@@ -93,7 +94,7 @@ test("multi-selects support titled choices, defaults, omission and cardinality",
     { value: "b", title: "Beta" },
   ]);
   expect(questionState(field, form.defaults.tags)).toEqual({
-    text: undefined,
+    kind: "multi",
     value: ["b"],
     highlight: 0,
     confirmed: false,
@@ -178,16 +179,42 @@ test("question defaults are unconfirmed and optional choices have a distinct ski
     { title: "Skip (leave unset)", value: undefined },
   ]);
   expect(questionState(form.fields[0]!, false)).toEqual({
-    text: undefined,
+    kind: "choice",
     value: false,
     highlight: 1,
     confirmed: false,
   });
   expect(questionState(form.fields[1]!, 0)).toEqual({
+    kind: "number",
     text: "0",
     value: 0,
-    highlight: 0,
     confirmed: false,
   });
   expect(form.validateField(form.fields[0]!, undefined)).toBeUndefined();
+});
+
+test("widget-specific edits invalidate answers without conflating navigation and selection", () => {
+  const form = createForm({
+    properties: {
+      tags: { type: "array", items: { type: "string", enum: ["a", "b"] } },
+      free: { type: "array", items: { type: "string" } },
+    },
+  });
+  const field = form.fields[0]!;
+  const confirmed = editQuestion(field, questionState(field, ["a"]), {
+    kind: "confirm",
+    value: ["a"],
+  });
+  const navigated = editQuestion(field, confirmed, { kind: "highlight", highlight: 1 });
+  expect(navigated.confirmed).toBe(true);
+  const changed = editQuestion(field, navigated, {
+    kind: "selection",
+    value: ["a", "b"],
+    highlight: 1,
+  });
+  expect(changed.confirmed).toBe(false);
+  expect(changed.answer).toBeUndefined();
+  expect(editQuestion(field, confirmed, { kind: "text", text: "wrong widget" })).toBe(confirmed);
+  expect(form.fields[1]?.kind).toBe("json");
+  expect(questionState(form.fields[1]!, ["anything"]).kind).toBe("json");
 });

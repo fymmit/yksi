@@ -8,9 +8,10 @@ import {
   questionChoices,
   questionState,
   sameAnswer,
+  editQuestion,
   type FormContent,
   type FormErrors,
-  type QuestionState,
+  type QuestionEdit,
 } from "./form-state";
 import { editorColors, scrollbarColors, selectionColors, type Theme } from "./theme";
 import { defaultKeybindings, type Keybindings, type KeyContext } from "../keybindings";
@@ -50,15 +51,17 @@ export function FormView(props: {
       json() ? "form.json" : field && questionChoices(field).length ? "form.choice" : "form.text",
     );
   });
-  const update = (position: number, patch: Partial<QuestionState>) =>
+  const update = (position: number, edit: QuestionEdit) =>
     setQuestions(previous =>
-      previous.map((question, i) => (i === position ? { ...question, ...patch } : question)),
+      previous.map((question, i) =>
+        i === position ? editQuestion(form.fields[i]!, question, edit) : question,
+      ),
     );
   const saveEditor = () => {
     if (json() || !activeEditor) return;
     const { index: position, editor } = activeEditor;
     if (editor.plainText !== (questions()[position]?.text ?? "")) {
-      update(position, { text: editor.plainText, confirmed: false });
+      update(position, { kind: "text", text: editor.plainText });
     }
   };
   const navigate = (next: number, captureDraft = true) => {
@@ -117,13 +120,13 @@ export function FormView(props: {
     const choices = questionChoices(field);
     let value: FormContent[string] | undefined;
     if (!skip) {
-      if (field.type === "array") {
+      if (field.kind === "multi") {
         value =
-          choices[question.highlight]?.value === undefined && !field.required
+          choices[question.highlight ?? 0]?.value === undefined && !field.required
             ? undefined
             : (question.value ?? []);
-      } else if (choices.length) value = choices[question.highlight]?.value;
-      else if (field.type === "number" || field.type === "integer") {
+      } else if (choices.length) value = choices[question.highlight ?? 0]?.value;
+      else if (field.kind === "number") {
         value = numberValue(question.text ?? "");
         if (value === undefined) {
           showErrors({ fields: { [field.name]: "Enter a finite number." }, summary: "" });
@@ -136,28 +139,23 @@ export function FormView(props: {
       showErrors(invalid);
       return;
     }
-    update(index(), {
-      confirmed: true,
-      answer: value,
-      value,
-      text: choices.length || value === undefined ? undefined : String(value),
-    });
+    update(index(), { kind: "confirm", value });
     setErrors({ fields: {}, summary: "" });
     advance();
   };
   const toggleSelection = (highlight: number) => {
     if (submitted) return;
     const field = form.fields[index()];
-    if (field?.type !== "array") return;
+    if (field?.kind !== "multi") return;
     const choice = questionChoices(field)[highlight];
     if (typeof choice?.value !== "string") return;
     const value = choice.value;
     const selected = questions()[index()]!.value;
     const values = Array.isArray(selected) ? selected : [];
     update(index(), {
+      kind: "selection",
       highlight,
       value: values.includes(value) ? values.filter(item => item !== value) : [...values, value],
-      confirmed: false,
     });
     setErrors({ fields: {}, summary: "" });
   };
@@ -168,10 +166,7 @@ export function FormView(props: {
       const question = questions()[i]!;
       let value = question.value;
       if (!questionChoices(field).length && question.text !== undefined) {
-        value =
-          field.type === "number" || field.type === "integer"
-            ? numberValue(question.text)
-            : question.text;
+        value = field.kind === "number" ? numberValue(question.text) : question.text;
         if (value === undefined) {
           showErrors({
             fields: { [field.name]: "Enter a finite number before switching to JSON." },
@@ -223,7 +218,7 @@ export function FormView(props: {
               ? question.value
               : question.text === undefined
                 ? undefined
-                : field.type === "number" || field.type === "integer"
+                : field.kind === "number"
                   ? numberValue(question.text)
                   : question.text;
             return sameAnswer(value, original) ? question : questionState(field, value);
@@ -286,19 +281,13 @@ export function FormView(props: {
       if (!field.required) confirm(true);
       else {
         activeEditor?.editor.setText("");
-        update(index(), {
-          text: undefined,
-          value: undefined,
-          confirmed: false,
-          answer: undefined,
-          highlight: 0,
-        });
+        update(index(), { kind: "reset" });
       }
       return;
     }
     const choices = questionChoices(field);
-    if (choices.length && field.type === "array" && keys.matches("form.toggle", key)) {
-      if (consumeKey(key)) toggleSelection(questions()[index()]!.highlight);
+    if (choices.length && field.kind === "multi" && keys.matches("form.toggle", key)) {
+      if (consumeKey(key)) toggleSelection(questions()[index()]!.highlight ?? 0);
       return;
     }
     if (
@@ -310,10 +299,11 @@ export function FormView(props: {
         0,
         Math.min(
           choices.length - 1,
-          questions()[index()]!.highlight + (keys.matches("form.optionPrevious", key) ? -1 : 1),
+          (questions()[index()]!.highlight ?? 0) +
+            (keys.matches("form.optionPrevious", key) ? -1 : 1),
         ),
       );
-      update(index(), { highlight });
+      update(index(), { kind: "highlight", highlight });
       optionsScroll?.scrollChildIntoView(`question-option-${index()}-${highlight}`);
       return;
     }
@@ -402,7 +392,7 @@ export function FormView(props: {
                           {...editorColors(props.theme)}
                           onContentChange={() => {
                             if (editor && editor.plainText !== (question().text ?? ""))
-                              update(position, { text: editor.plainText, confirmed: false });
+                              update(position, { kind: "text", text: editor.plainText });
                           }}
                         />
                       }
@@ -433,14 +423,14 @@ export function FormView(props: {
                               }
                               onMouseDown={() => {
                                 if (submitted || props.active === false) return;
-                                update(position, { highlight: i() });
-                                if (field.type === "array" && choice.value !== undefined)
+                                update(position, { kind: "highlight", highlight: i() });
+                                if (field.kind === "multi" && choice.value !== undefined)
                                   toggleSelection(i());
                                 else confirm();
                               }}
                             >
                               {question().highlight === i() ? "> " : "  "}
-                              {field.type === "array" && typeof choice.value === "string"
+                              {field.kind === "multi" && typeof choice.value === "string"
                                 ? selected().includes(choice.value)
                                   ? "[x] "
                                   : "[ ] "
@@ -459,7 +449,7 @@ export function FormView(props: {
                         {errors().fields[field.name]}
                       </text>
                     </Show>
-                    <Show when={field.type === "array"}>
+                    <Show when={field.kind === "multi"}>
                       <text {...selectionColors(props.theme)} fg={props.theme.muted} flexShrink={0}>
                         {selected().length} selected ·{" "}
                         {hint("form.clear", field.required ? "clear" : "skip")}
@@ -473,10 +463,10 @@ export function FormView(props: {
                               hint("form.optionNext", "next option"),
                             ]
                           : []),
-                        ...(field.type === "array" ? [hint("form.toggle", "toggle")] : []),
+                        ...(field.kind === "multi" ? [hint("form.toggle", "toggle")] : []),
                         hint(
                           "form.confirm",
-                          choices.length && field.type !== "array" ? "select" : "confirm",
+                          choices.length && field.kind !== "multi" ? "select" : "confirm",
                         ),
                         ...(!choices.length
                           ? [hint("form.clear", field.required ? "clear" : "skip")]

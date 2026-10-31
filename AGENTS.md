@@ -76,6 +76,8 @@ from other directories. Bundles require the preload too (see docs/development.md
   `form.tsx` and `form-state.ts` render and validate keyboard-driven elicitation
   forms, with checkbox multi-selects for finite-choice string arrays and JSON
   fallback for other arrays and unsupported widget types.
+  Fields and question drafts discriminate widget kinds; typed edit transitions
+  keep text, choice navigation, selection and confirmation state distinct.
 - `src/demo-agent.ts`: real stdio ACP demo; simulated edits, no model service.
 - `tests/fixtures/agent.ts`: deterministic protocol fixture for lifecycle tests.
 - `bin/yksi.ts`, `scripts/build.ts`: launcher and bundle build.

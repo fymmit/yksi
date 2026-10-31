@@ -6,27 +6,48 @@ const ajv = new Ajv({ strict: false, allErrors: true });
 addFormats(ajv);
 
 export type FormContent = Record<string, ElicitationContentValue>;
-export type FormField = {
+type FieldBase = {
   name: string;
   title: string;
   description?: string;
   required: boolean;
-  type: string;
-  choices?: { value: string; title: string }[];
 };
+type FieldChoices = { value: string; title: string }[];
+export type FormField = FieldBase &
+  (
+    | { kind: "text"; type: "string"; choices?: never }
+    | { kind: "number"; type: "number" | "integer"; choices?: never }
+    | { kind: "boolean"; type: "boolean"; choices?: never }
+    | { kind: "choice"; type: "string"; choices: FieldChoices }
+    | { kind: "multi"; type: "array"; choices: FieldChoices }
+    | { kind: "json"; type: string; choices?: never }
+  );
 export type FormErrors = { fields: Record<string, string>; summary: string };
 export type QuestionChoice = { title: string; value: string | boolean | undefined };
-export type QuestionState = {
-  text?: string;
+type QuestionDraft = {
+  // Keep raw values until validation, including invalid defaults and JSON input.
   value?: ElicitationContentValue;
-  highlight: number;
-  confirmed: boolean;
-  answer?: ElicitationContentValue;
 };
+export type QuestionState = QuestionDraft &
+  (
+    | { kind: "text" | "number"; text?: string; highlight?: never }
+    | { kind: "choice" | "multi"; text?: never; highlight: number }
+    | { kind: "json"; text?: never; highlight?: never }
+  ) &
+  (
+    | { confirmed: false; answer?: never }
+    | { confirmed: true; answer: ElicitationContentValue | undefined }
+  );
+export type QuestionEdit =
+  | { kind: "text"; text: string }
+  | { kind: "highlight"; highlight: number }
+  | { kind: "selection"; highlight: number; value: string[] }
+  | { kind: "confirm"; value: ElicitationContentValue | undefined }
+  | { kind: "reset" };
 
 export function questionChoices(field: FormField): QuestionChoice[] {
   const choices: QuestionChoice[] =
-    field.type === "boolean"
+    field.kind === "boolean"
       ? [
           { title: "Yes", value: true },
           { title: "No", value: false },
@@ -39,10 +60,18 @@ export function questionChoices(field: FormField): QuestionChoice[] {
 
 export function questionState(field: FormField, value?: ElicitationContentValue): QuestionState {
   const choices = questionChoices(field);
+  if (field.kind === "json") return { kind: "json", value, confirmed: false };
+  if (field.kind === "text" || field.kind === "number")
+    return {
+      kind: field.kind,
+      text: value === undefined ? undefined : String(value),
+      value,
+      confirmed: false,
+    };
   return {
-    text:
-      field.type === "array" || choices.length || value === undefined ? undefined : String(value),
+    kind: field.kind === "multi" ? "multi" : "choice",
     value,
+    confirmed: false,
     highlight:
       value === undefined
         ? 0
@@ -50,8 +79,43 @@ export function questionState(field: FormField, value?: ElicitationContentValue)
             0,
             choices.findIndex(choice => choice.value === value),
           ),
-    confirmed: false,
   };
+}
+
+/** State transitions preserve widget-specific draft data and confirmation rules. */
+export function editQuestion(
+  field: FormField,
+  question: QuestionState,
+  edit: QuestionEdit,
+): QuestionState {
+  switch (edit.kind) {
+    case "text":
+      return question.kind === "text" || question.kind === "number"
+        ? { ...question, text: edit.text, confirmed: false, answer: undefined }
+        : question;
+    case "highlight":
+      return question.kind === "choice" || question.kind === "multi"
+        ? { ...question, highlight: edit.highlight }
+        : question;
+    case "selection":
+      return question.kind === "multi"
+        ? {
+            ...question,
+            value: edit.value,
+            highlight: edit.highlight,
+            confirmed: false,
+            answer: undefined,
+          }
+        : question;
+    case "reset":
+      return questionState(field);
+    case "confirm": {
+      const next = questionState(field, edit.value);
+      if ((next.kind === "choice" || next.kind === "multi") && question.highlight !== undefined)
+        next.highlight = question.highlight;
+      return { ...next, confirmed: true, answer: edit.value };
+    }
+  }
 }
 
 export function sameAnswer(
@@ -155,22 +219,24 @@ export function createForm(schema: ElicitationSchema) {
           choices = undefined;
       }
     }
-    return {
+    const base = {
       name,
       title: typeof property.title === "string" ? property.title : name,
       description: typeof property.description === "string" ? property.description : undefined,
       required: schema.required?.includes(name) ?? false,
-      type: property.type,
-      choices,
     };
+    if (property.type === "string")
+      return choices?.length
+        ? { ...base, kind: "choice", type: "string", choices }
+        : { ...base, kind: "text", type: "string" };
+    if (property.type === "number" || property.type === "integer")
+      return { ...base, kind: "number", type: property.type };
+    if (property.type === "boolean") return { ...base, kind: "boolean", type: "boolean" };
+    if (property.type === "array" && choices)
+      return { ...base, kind: "multi", type: "array", choices };
+    return { ...base, kind: "json", type: property.type };
   });
-  const fallback = fields
-    .filter(
-      field =>
-        !["string", "number", "integer", "boolean"].includes(field.type) &&
-        !(field.type === "array" && field.choices),
-    )
-    .map(field => field.title);
+  const fallback = fields.filter(field => field.kind === "json").map(field => field.title);
   const defaults: FormContent = Object.fromEntries(
     Object.entries(schema.properties ?? {}).flatMap(([name, property]) =>
       contentValue(property.default) ? [[name, structuredClone(property.default)]] : [],
@@ -227,7 +293,7 @@ export function createForm(schema: ElicitationSchema) {
             const answer = value[field.name];
             const choices = field.choices;
             return (
-              field.type === "array" &&
+              field.kind === "multi" &&
               choices &&
               answer !== undefined &&
               (!Array.isArray(answer) ||
