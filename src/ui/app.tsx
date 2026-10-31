@@ -6,6 +6,7 @@ import { basename, relative } from "node:path";
 import { Controller, type Snapshot } from "../controller";
 import { changedFiles, type Message } from "../state";
 import { sessionMode } from "../modes";
+import { modelOption, optionChoices, optionValueLabel } from "../session-options";
 import { projectFiles } from "../files";
 import { appPaths } from "../config";
 import {
@@ -174,7 +175,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     title = option.name,
   ) => {
     if (option.type === "boolean") return controller.setConfig(option.id, !option.currentValue);
-    const values = option.options.flatMap(value => ("options" in value ? value.options : [value]));
+    const values = optionChoices(option);
     setPalette({
       title,
       choices: values.map(value => ({
@@ -186,9 +187,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     });
   };
   const showModel = () => {
-    const option = state.session.configOptions.find(
-      option => option.category === "model" && option.type === "select",
-    );
+    const option = modelOption(state.session.configOptions);
     if (option) showConfigOption(option, "Choose model");
     else setNotice("This agent does not advertise a model selector.");
   };
@@ -199,7 +198,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         ...state.session.configOptions.map(option => ({
           id: option.id,
           label: option.name,
-          detail: String(option.currentValue),
+          detail: optionValueLabel(option),
           run: () => showConfigOption(option),
         })),
         ...(state.session.configOptions.length
@@ -629,13 +628,16 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
             <For each={state.session.configOptions}>
               {option => (
                 <text {...selectionColors(theme())} fg={theme().muted}>
-                  {option.name}: {String(option.currentValue)}
+                  {option.name}: {optionValueLabel(option)}
                 </text>
               )}
             </For>
             <Show when={!state.session.configOptions.length && state.session.modes}>
               <text {...selectionColors(theme())} fg={theme().muted}>
-                Mode: {state.session.modes?.currentModeId}
+                Mode:{" "}
+                {state.session.modes?.availableModes.find(
+                  mode => mode.id === state.session.modes?.currentModeId,
+                )?.name ?? state.session.modes?.currentModeId}
               </text>
             </Show>
             <Show when={state.session.usage}>

@@ -8,6 +8,7 @@ import { AgentClient } from "./acp/client";
 import { sessionMode } from "./modes";
 import { cleanup } from "./cleanup";
 import { preparePrompt } from "./prompt";
+import { modelOption, optionChoices } from "./session-options";
 
 export type Interaction = {
   id: string;
@@ -315,14 +316,9 @@ export class Controller extends EventEmitter {
       session.configOptions = result.configOptions ?? [];
       if (!saved?.remoteId) {
         const remembered = this.storage.setting(`model:${session.agent}`, undefined);
-        const model = session.configOptions.find(
-          option => option.category === "model" && option.type === "select",
-        );
+        const model = modelOption(session.configOptions);
         if (remembered !== undefined && model?.currentValue !== remembered) {
-          const choices =
-            model?.type === "select"
-              ? model.options.flatMap(option => ("options" in option ? option.options : [option]))
-              : [];
+          const choices = model ? optionChoices(model) : [];
           if (!model || !choices.some(choice => choice.value === remembered)) {
             this.error = `Remembered model "${remembered}" is unavailable; using the agent's default.`;
           } else {
@@ -446,9 +442,7 @@ export class Controller extends EventEmitter {
     );
   }
   async setConfig(configId: string, value: string | boolean) {
-    const model = this.session.configOptions.find(
-      option => option.category === "model" && option.type === "select",
-    );
+    const model = modelOption(this.session.configOptions);
     await this.changeSetting(
       (client, session) => {
         const params: acp.SetSessionConfigOptionRequest =

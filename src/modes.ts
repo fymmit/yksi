@@ -1,4 +1,5 @@
 import type { Session } from "./state";
+import { optionChoices } from "./session-options";
 
 /** A semantic mode selector, using config options in preference to legacy modes. */
 export function sessionMode(session: Pick<Session, "configOptions" | "modes">) {
@@ -13,7 +14,7 @@ export function sessionMode(session: Pick<Session, "configOptions" | "modes">) {
               { value: false, name: "Off" },
               { value: true, name: "On" },
             ]
-          : option.options.flatMap(value => ("options" in value ? value.options : [value])),
+          : optionChoices(option),
       name: option.name,
     };
   if (session.configOptions.length || !session.modes) return;

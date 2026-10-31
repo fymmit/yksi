@@ -44,6 +44,8 @@ from other directories. Bundles require the preload too (see docs/development.md
   overrides, exact key matching, and shortcut labels.
 - `src/modes.ts`: semantic mode selection, preferring categorized config options
   over the legacy session modes API.
+  `session-options.ts` shares first-model selection, grouped choice flattening,
+  and display labels across the controller, pickers, sidebar and footer.
 - `src/acp/client.ts`: SDK fluent client, stdio, capabilities, stderr and timeouts.
 - `src/acp/files.ts`, `src/acp/terminals.ts`: ACP client resource methods.
 - `src/controller.ts`: connection/session lifecycle, permission and question

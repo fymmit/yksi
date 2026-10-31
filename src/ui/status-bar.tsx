@@ -1,6 +1,7 @@
 import { createMemo } from "solid-js";
 import type { Keybindings } from "../keybindings";
 import { sessionMode } from "../modes";
+import { optionValueLabel } from "../session-options";
 import { changedFiles, type Session } from "../state";
 import { selectionColors, type Theme } from "./theme";
 import { formatCost } from "./usage";
@@ -57,14 +58,7 @@ export function StatusBar(props: {
         id,
       });
     for (const option of session.configOptions) {
-      const value =
-        option.type === "boolean"
-          ? option.currentValue
-            ? "On"
-            : "Off"
-          : (option.options
-              .flatMap(value => ("options" in value ? value.options : [value]))
-              .find(value => value.value === option.currentValue)?.name ?? option.currentValue);
+      const value = optionValueLabel(option);
       const kind =
         option.category === "mode" ||
         option.category === "model" ||
