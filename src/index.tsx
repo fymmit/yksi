@@ -10,6 +10,7 @@ import { Controller } from "./controller";
 import { App } from "./ui/app";
 import { defaultKeybindings } from "./keybindings";
 import { cleanup } from "./cleanup";
+import { version } from "../package.json";
 
 async function main() {
   const { values, positionals } = parseArgs({
@@ -46,7 +47,7 @@ Customize shortcuts with keybindings in your configuration file.`);
     return;
   }
   if (values.version) {
-    console.log("0.1.0");
+    console.log(version);
     return;
   }
   if (positionals.length > 1) throw new Error("Expected at most one project directory.");

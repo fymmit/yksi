@@ -101,6 +101,9 @@ File attachments are explicit selections via Ctrl+X, F or `@` then Tab. Attached
 text is read on submission (up to 1 MiB per file), embedded as an ACP resource
 when supported, otherwise sent as text. Use **Clear attachments** in the palette
 to remove them. Inline `@path` tokens are not expanded automatically.
+If an attachment cannot be read or is rejected, your draft and attachment selection
+stay in the composer. After local preparation succeeds, the submitted draft clears
+while the agent works; newer edits made during preparation are preserved.
 
 ## Forms and permissions
 
@@ -141,6 +144,11 @@ Set `YKSI_DATA_DIR` to use a separate data directory. Local history is scoped
 to the canonical project directory and shows up to 100 recent sessions. The
 timeline initially renders the latest 200 entries; **Show earlier messages**
 loads more. History and logs may contain the content of your coding sessions.
+Unreadable saved records are reported in the session picker and left in the database;
+other sessions remain available. History write errors appear in the interface while
+unsaved sessions are retained in memory and retried at later save opportunities.
+If saving still fails at exit, the application reports the failure after restoring
+the terminal; unsaved in-memory changes cannot survive process exit.
 
 Selecting a saved session attempts ACP resume/load only when supported. On a
 failed load, the local transcript remains readable; it is not silently sent to

@@ -253,7 +253,7 @@ creation, and advertised commands/settings. Automated tests use offline agents.
 
 Not yet implemented: remote transports, agent-registry installation, standalone
 native executables, background/multi-agent sessions, remote session discovery,
-image/audio attachments, terminal-based authentication, leader-key sequences, Git
+image/audio attachments, terminal-based authentication, Git
 undo/revert, or free-form array widgets.
 Demo sessions cannot resume after their process exits; local transcripts remain.
 

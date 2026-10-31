@@ -30,6 +30,9 @@ import { createCommands } from "./commands";
 import { createComposerState } from "./composer-state";
 import type { Storage } from "../storage";
 
+const TIMELINE_PAGE_SIZE = 200;
+const KEY_PREFIX_TIMEOUT_MS = 2000;
+
 type AppController = Pick<
   Controller,
   | "config"
@@ -80,7 +83,7 @@ export function App(props: {
   const [sidebar, setSidebar] = createSignal(storage.setting("sidebar", true));
   const [expanded, setExpanded] = createSignal(false);
   const [thoughts, setThoughts] = createSignal(false);
-  const [limit, setLimit] = createSignal(200);
+  const [limit, setLimit] = createSignal(TIMELINE_PAGE_SIZE);
   const [palette, setPalette] = createSignal<{ title: string; choices: Choice[] }>();
   const [help, setHelp] = createSignal<KeyContext>();
   const [formContext, setFormContext] = createSignal<KeyContext>("form.text");
@@ -123,7 +126,7 @@ export function App(props: {
       clearPrefix();
       setNotice("");
       composer.switchSession(previousId, snapshot.session.id);
-      setLimit(200);
+      setLimit(TIMELINE_PAGE_SIZE);
     }
     if (snapshot.interaction) {
       clearPrefix();
@@ -272,7 +275,7 @@ export function App(props: {
         tools: () => setExpanded(value => !value),
         thoughts: () => setThoughts(value => !value),
         theme: showThemes,
-        earlier: () => setLimit(value => value + 200),
+        earlier: () => setLimit(value => value + TIMELINE_PAGE_SIZE),
         export: async () => setNotice(`Exported ${await controller.exportTranscript()}`),
         paths: () => setNotice(`Config: ${appPaths().config} · Data: ${appPaths().data}`),
         quit: props.quit,
@@ -392,7 +395,7 @@ export function App(props: {
     if (keys.starts(context(), key)) {
       if (consumeKey(key)) {
         setPrefix({ key, context: context() });
-        prefixTimer = setTimeout(clearPrefix, 2000);
+        prefixTimer = setTimeout(clearPrefix, KEY_PREFIX_TIMEOUT_MS);
       }
       return;
     }
@@ -535,7 +538,7 @@ export function App(props: {
             <text
               {...selectionColors(theme())}
               fg={theme().muted}
-              onMouseDown={() => setLimit(value => value + 200)}
+              onMouseDown={() => setLimit(value => value + TIMELINE_PAGE_SIZE)}
             >
               Earlier messages hidden · “Show earlier messages” in the command palette (
               {hint("app.commands", "commands")})

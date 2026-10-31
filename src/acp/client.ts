@@ -6,6 +6,9 @@ import { dirname } from "node:path";
 import type { AgentDefinition } from "../config";
 import { readTextFile, writeTextFile } from "./files";
 import { stopProcess, Terminals } from "./terminals";
+import { version } from "../../package.json";
+
+const REQUEST_TIMEOUT_MS = 20_000;
 
 export type ClientEvents = {
   update: (notification: acp.SessionNotification) => void;
@@ -100,7 +103,7 @@ export class AgentClient {
     this.info = await this.withTimeout(
       this.agent.request(acp.methods.agent.initialize, {
         protocolVersion: acp.PROTOCOL_VERSION,
-        clientInfo: { name: "yksi", version: "0.1.0" },
+        clientInfo: { name: "yksi", version },
         clientCapabilities: {
           fs: { readTextFile: true, writeTextFile: true },
           terminal: true,
@@ -120,7 +123,7 @@ export class AgentClient {
       throw new Error("Agent is not connected");
     return this.connection.agent;
   }
-  async withTimeout<T>(promise: Promise<T>, ms = 20_000): Promise<T> {
+  async withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([

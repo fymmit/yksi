@@ -2,6 +2,10 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { isAbsolute } from "node:path";
 import type * as acp from "@agentclientprotocol/sdk";
 
+const DEFAULT_OUTPUT_BYTES = 128 * 1024;
+const MAX_OUTPUT_BYTES = 1024 * 1024;
+const TERMINATION_GRACE_MS = 1000;
+
 type Terminal = {
   process: ChildProcessWithoutNullStreams;
   sessionId: string;
@@ -31,7 +35,10 @@ export class Terminals {
       detached: process.platform !== "win32",
     });
     const id = crypto.randomUUID();
-    const limit = Math.max(0, Math.min(params.outputByteLimit ?? 128 * 1024, 1024 * 1024));
+    const limit = Math.max(
+      0,
+      Math.min(params.outputByteLimit ?? DEFAULT_OUTPUT_BYTES, MAX_OUTPUT_BYTES),
+    );
     let finish!: (status: acp.TerminalExitStatus) => void;
     const terminal: Terminal = {
       process: child,
@@ -107,6 +114,6 @@ export function stopProcess(child: ChildProcessWithoutNullStreams) {
     }
   };
   kill("SIGTERM");
-  const timer = setTimeout(() => kill("SIGKILL"), 1000);
+  const timer = setTimeout(() => kill("SIGKILL"), TERMINATION_GRACE_MS);
   timer.unref();
 }
