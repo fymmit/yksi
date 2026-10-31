@@ -19,6 +19,11 @@ headless native UI keyboard/rendering behavior. They need no login or paid model
 calls. CI targets Linux and macOS. See [`AGENTS.md`](../AGENTS.md) for the code
 layout, architecture, and repository conventions.
 
+History writes are recoverable failures: the controller retains unsaved sessions
+in memory across switches and retries on normal save opportunities. Persistence
+errors are displayed separately from agent errors. Shutdown attempts all resource
+cleanup even when saving fails, and reports cleanup errors after terminal restoration.
+
 ## Formatting and commit hooks
 
 Biome formats JavaScript/TypeScript (including TSX), JSON/JSONC, Markdown, and

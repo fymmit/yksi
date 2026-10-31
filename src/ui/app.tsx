@@ -665,15 +665,15 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           </scrollbox>
         </Show>
       </box>
-      <Show when={state.error || notice()}>
+      <Show when={state.error || state.persistenceError || notice()}>
         <text
           {...selectionColors(theme())}
-          fg={state.error ? theme().error : theme().muted}
+          fg={state.error || state.persistenceError ? theme().error : theme().muted}
           paddingX={1}
           maxHeight={3}
           flexShrink={0}
         >
-          {state.error ?? notice()}
+          {[state.error, state.persistenceError].filter(Boolean).join(" · ") || notice()}
         </text>
       </Show>
       <Show when={palette()} keyed>

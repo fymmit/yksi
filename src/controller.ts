@@ -7,6 +7,7 @@ import { Storage } from "./storage";
 import { addMessage, applyUpdate, newSession, type Session } from "./state";
 import { AgentClient } from "./acp/client";
 import { sessionMode } from "./modes";
+import { cleanup } from "./cleanup";
 
 export type Interaction = {
   id: string;
@@ -22,6 +23,7 @@ export type Snapshot = {
   status: Status;
   interaction?: Interaction;
   error?: string;
+  persistenceError?: string;
   agentName?: string;
   terminalOutput: Record<string, string>;
 };
@@ -42,6 +44,8 @@ export class Controller extends EventEmitter {
   private closed = false;
   private generation = 0;
   private settingRequest?: symbol;
+  private persistenceError?: string;
+  private unsaved = new Map<string, Session>();
 
   constructor(
     readonly config: Config,
@@ -61,6 +65,7 @@ export class Controller extends EventEmitter {
       session: structuredClone(this.session),
       status: this.status,
       error: this.error,
+      persistenceError: this.persistenceError,
       interaction: this.pending[0]?.interaction,
       agentName: this.client?.info?.agentInfo?.title ?? this.client?.info?.agentInfo?.name,
       terminalOutput: { ...this.terminalOutput },
@@ -81,7 +86,20 @@ export class Controller extends EventEmitter {
   }
   private persist() {
     if (this.session.items.some(item => item.type === "tool" || item.role !== "system"))
-      this.storage.save(this.session);
+      this.unsaved.set(this.session.id, this.session);
+    const previousError = this.persistenceError;
+    this.persistenceError = undefined;
+    for (const [id, session] of this.unsaved) {
+      try {
+        this.storage.save(session);
+        this.unsaved.delete(id);
+      } catch (error) {
+        this.persistenceError = `Could not save session history: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    // Reporting a failed save must not schedule another save.
+    if (!this.closed && previousError !== this.persistenceError)
+      this.emit("change", this.snapshot());
   }
   report(error: unknown) {
     this.error = error instanceof Error ? error.message : String(error);
@@ -534,9 +552,14 @@ export class Controller extends EventEmitter {
     clearTimeout(this.publishTimer);
     clearTimeout(this.saveTimer);
     clearTimeout(this.cancelTimer);
-    this.dismissInteractions();
-    this.client?.dispose();
-    this.persist();
-    this.removeAllListeners();
+    cleanup(
+      () => this.dismissInteractions(),
+      () => this.client?.dispose(),
+      () => {
+        this.persist();
+        if (this.persistenceError) throw new Error(this.persistenceError);
+      },
+      () => this.removeAllListeners(),
+    );
   }
 }

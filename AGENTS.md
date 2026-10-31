@@ -114,6 +114,9 @@ from other directories. Bundles require the preload too (see docs/development.md
   use the launching user's privileges; honor the agent's permission flow.
 - Agent stdout is reserved for NDJSON; capture stderr to the log. On shutdown,
   restore the terminal, close SQLite, and terminate owned process groups.
+  Attempt every cleanup even if another fails. History write failures are recoverable:
+  expose a separate persistence error, retain unsaved sessions across switches, and
+  retry at the next normal save opportunity without a reporting/retry loop.
 - UI state/settings are local. Do not automatically execute project-local agent
   configuration. The only configuration is the global file or explicit --config.
 - Themes are startup-loaded global config: `theme` selects an explicit startup

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { resolve } from "node:path";
 import { Controller, type Snapshot } from "../src/controller";
 import { configSchema, demoAgent } from "../src/config";
@@ -24,6 +24,59 @@ function setup() {
     },
   };
 }
+
+test("failed saves preserve turns and switched sessions and recover without a retry loop", async () => {
+  const { controller, dispose } = setup();
+  const save = controller.storage.save.bind(controller.storage);
+  const failing = spyOn(controller.storage, "save").mockImplementation(() => {
+    throw new Error("disk full");
+  });
+  try {
+    await controller.open();
+    await controller.send("/help");
+    const first = controller.session.id;
+    expect(controller.status).toBe("ready");
+    expect(controller.snapshot().persistenceError).toContain("disk full");
+    await Bun.sleep(550);
+    const attempts = failing.mock.calls.length;
+    await Bun.sleep(550);
+    expect(failing.mock.calls.length).toBe(attempts);
+    await controller.open();
+    expect(controller.status).toBe("ready");
+    failing.mockImplementation(save);
+    await controller.send("/help");
+    expect(controller.snapshot().persistenceError).toBeUndefined();
+    expect(controller.storage.list(controller.cwd).map(session => session.id)).toContain(first);
+  } finally {
+    failing.mockRestore();
+    dispose();
+  }
+});
+
+test("disposal removes listeners and dismisses interactions even when final saving fails", async () => {
+  const { controller, dispose } = setup();
+  await controller.open();
+  const asked = new Promise<void>(resolve =>
+    controller.on("change", state => {
+      if (state.interaction) resolve();
+    }),
+  );
+  const turn = controller.send("/question");
+  await asked;
+  const failing = spyOn(controller.storage, "save").mockImplementation(() => {
+    throw new Error("disk full");
+  });
+  try {
+    expect(() => controller.dispose()).toThrow(AggregateError);
+    expect(controller.listenerCount("change")).toBe(0);
+    expect(controller.snapshot().interaction).toBeUndefined();
+    expect(() => controller.dispose()).not.toThrow();
+    await turn;
+  } finally {
+    failing.mockRestore();
+    dispose();
+  }
+});
 
 test("an unused remote session is not saved while open, on switch, or on exit", async () => {
   const { controller, dispose } = setup();

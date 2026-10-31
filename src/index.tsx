@@ -9,6 +9,7 @@ import { Storage } from "./storage";
 import { Controller } from "./controller";
 import { App } from "./ui/app";
 import { defaultKeybindings } from "./keybindings";
+import { cleanup } from "./cleanup";
 
 async function main() {
   const { values, positionals } = parseArgs({
@@ -68,23 +69,35 @@ Customize shortcuts with keybindings in your configuration file.`);
     agent,
     join(appPaths().data, "agent.log"),
   );
-  const renderer = await createCliRenderer({
-    exitOnCtrlC: false,
-    targetFps: 30,
-    useMouse: true,
-    screenMode: "alternate-screen",
-  });
+  let renderer: Awaited<ReturnType<typeof createCliRenderer>> | undefined;
   let quitting = false;
   const quit = () => {
     if (quitting) return;
     quitting = true;
-    controller.dispose();
-    storage.close();
-    renderer.destroy();
+    try {
+      cleanup(
+        () => controller.dispose(),
+        () => storage.close(),
+        () => renderer?.destroy(),
+      );
+    } catch (error) {
+      console.error(error);
+      process.exitCode = 1;
+    }
   };
   process.once("SIGTERM", quit);
   process.once("SIGINT", quit);
   try {
+    renderer = await createCliRenderer({
+      exitOnCtrlC: false,
+      targetFps: 30,
+      useMouse: true,
+      screenMode: "alternate-screen",
+    });
+    if (quitting) {
+      renderer.destroy();
+      return;
+    }
     await render(() => <App controller={controller} quit={quit} />, renderer);
     await renderer.closed;
   } finally {
