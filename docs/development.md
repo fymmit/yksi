@@ -23,6 +23,10 @@ History writes are recoverable failures: the controller retains unsaved sessions
 in memory across switches and retries on normal save opportunities. Persistence
 errors are displayed separately from agent errors. Shutdown attempts all resource
 cleanup even when saving fails, and reports cleanup errors after terminal restoration.
+Saved sessions are validated per row using the pinned stable ACP schema, preserving
+extension metadata and legacy optional fields. Invalid rows stay in SQLite and the
+session picker reports skipped records. Settings are validated against their key's
+value type. Databases newer than this client's supported schema are rejected.
 
 ## Formatting and commit hooks
 

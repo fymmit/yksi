@@ -314,10 +314,7 @@ export class Controller extends EventEmitter {
       session.modes = result.modes;
       session.configOptions = result.configOptions ?? [];
       if (!saved?.remoteId) {
-        const remembered = this.storage.setting<string | undefined>(
-          `model:${session.agent}`,
-          undefined,
-        );
+        const remembered = this.storage.setting(`model:${session.agent}`, undefined);
         const model = session.configOptions.find(
           option => option.category === "model" && option.type === "select",
         );
@@ -467,7 +464,8 @@ export class Controller extends EventEmitter {
             option =>
               option.id === configId && option.category === "model" && option.type === "select",
           );
-          if (confirmed) this.storage.setSetting(`model:${session.agent}`, confirmed.currentValue);
+          if (confirmed?.type === "select")
+            this.storage.setSetting(`model:${session.agent}`, confirmed.currentValue);
         }
       },
     );

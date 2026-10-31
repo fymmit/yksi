@@ -50,6 +50,10 @@ from other directories. Bundles require the preload too (see docs/development.md
   queues, cancellation, turn submission, replay, settings, throttled snapshots.
 - `src/state.ts`: serializable conversation model and update reducer.
 - `src/storage.ts`: SQLite persistence, workspace-scoped local history.
+  `session-codec.ts` validates saved records using local fields and the stable ACP
+  schema without stripping metadata. Invalid rows are reported individually and
+  retained; settings have a typed, runtime-validated key/value contract. Database
+  initialization respects `user_version` and rejects unsupported newer versions.
 - `src/ui/`: Solid components, palette, composer, tool/diff rendering and themes.
   `timeline.tsx` renders left-aligned assistant and right-aligned user message cards;
   `message-time.ts` formats local message times, with full dates outside today.

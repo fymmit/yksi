@@ -135,16 +135,23 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         run: () => controller.open(undefined, name),
       })),
     });
-  const showSessions = () =>
+  const showSessions = () => {
+    const issues: string[] = [];
+    const sessions = controller.storage.list(controller.cwd, issue => issues.push(issue.id));
+    if (issues.length)
+      setNotice(
+        `Could not read ${issues.length} saved session(s): ${issues.join(", ")}. Records remain in the history database.`,
+      );
     setPalette({
       title: `Sessions · ${basename(controller.cwd)}`,
-      choices: controller.storage.list(controller.cwd).map(session => ({
+      choices: sessions.map(session => ({
         id: session.id,
         label: session.title,
         detail: `${session.agent} · ${new Date(session.updatedAt).toLocaleString()}`,
         run: () => (session.id === state.session.id ? undefined : controller.open(session)),
       })),
     });
+  };
   const showFiles = async () => {
     setNotice("Finding project files…");
     const files = await projectFiles(controller.cwd);
