@@ -103,3 +103,64 @@ test("delayed acceptance preserves edits made during preparation", async () => {
     storage.close();
   }
 });
+
+test("unsupported terminal authentication is not offered as a client command", async () => {
+  const storage = new Storage(":memory:");
+  const controller = new Controller(
+    configSchema.parse({ agents: { demo: demoAgent() } }),
+    storage,
+    process.cwd(),
+    "demo",
+  );
+  await controller.open();
+  controller.client!.info!.authMethods = [
+    { id: "copilot-login", name: "Log in with Copilot CLI", description: "Run `copilot login`" },
+  ];
+  const setup = await testRender(
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
+    { width: 100, height: 30 },
+  );
+  try {
+    await setup.renderOnce();
+    setup.mockInput.pressKey("x", { ctrl: true });
+    setup.mockInput.pressKey("p");
+    await setup.renderOnce();
+    await setup.mockInput.typeText("Authenticate");
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("No matches");
+  } finally {
+    controller.dispose();
+    await setup.dispose();
+    storage.close();
+  }
+});
+
+test("unsupported authentication slash commands are rejected", async () => {
+  const storage = new Storage(":memory:");
+  const controller = new Controller(
+    configSchema.parse({ agents: { demo: demoAgent() } }),
+    storage,
+    process.cwd(),
+    "demo",
+  );
+  await controller.open();
+  controller.client!.info!.authMethods = [
+    { id: "copilot-login", name: "Log in with Copilot CLI", description: "Run `copilot login`" },
+  ];
+  const setup = await testRender(
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
+    { width: 100, height: 30 },
+  );
+  try {
+    await setup.renderOnce();
+    await setup.mockInput.typeText("/tui:auth:copilot-login");
+    setup.mockInput.pressEnter();
+    await setup.renderOnce();
+    expect(setup.captureCharFrame()).toContain("Unknown client command");
+    expect(controller.session.inputHistory).toEqual([]);
+  } finally {
+    controller.dispose();
+    await setup.dispose();
+    storage.close();
+  }
+});

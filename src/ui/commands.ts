@@ -35,15 +35,10 @@ const definitions = {
 type CommandHandlers = Record<keyof typeof definitions, Choice["run"]>;
 
 /** One executable list drives shortcuts, the palette and local slash commands. */
-export function createCommands(
-  handlers: CommandHandlers,
-  dynamic: Choice[],
-  keys: Keybindings,
-): ClientCommand[] {
+export function createCommands(handlers: CommandHandlers, keys: Keybindings): ClientCommand[] {
   const commands: ClientCommand[] = (Object.keys(definitions) as (keyof typeof definitions)[]).map(
     id => ({ id, ...definitions[id], run: handlers[id] }),
   );
-  commands.splice(commands.length - 1, 0, ...dynamic);
   return commands.map(command => ({
     ...command,
     detail:

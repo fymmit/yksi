@@ -41,7 +41,6 @@ export type Snapshot = {
   persistenceError?: string;
   agentName?: string;
   terminalOutput: Record<string, string>;
-  authMethods?: acp.AuthMethod[];
 };
 
 export class Controller extends EventEmitter {
@@ -85,7 +84,6 @@ export class Controller extends EventEmitter {
       interaction: structuredClone(this.pending[0]?.interaction),
       agentName: this.client?.info?.agentInfo?.title ?? this.client?.info?.agentInfo?.name,
       terminalOutput: { ...this.terminalOutput },
-      authMethods: structuredClone(this.client?.info?.authMethods ?? []),
     };
   }
   private publish(immediate = false) {
@@ -555,23 +553,6 @@ export class Controller extends EventEmitter {
       if (current()) throw error;
     } finally {
       if (this.settingRequest === token) this.settingRequest = undefined;
-    }
-  }
-  async authenticate(methodId: string) {
-    if (!this.client || this.busy) throw new Error("Connect to an agent first.");
-    const generation = this.generation;
-    this.status = "connecting";
-    this.error = undefined;
-    this.publish(true);
-    try {
-      await this.client.agent.request(acp.methods.agent.authenticate, { methodId });
-      if (this.closed || generation !== this.generation) return;
-      this.status = "ready";
-      await this.open(this.session.remoteId ? this.session : undefined);
-    } catch (error) {
-      if (this.closed || generation !== this.generation) return;
-      this.status = "disconnected";
-      this.report(error);
     }
   }
   async exportTranscript() {

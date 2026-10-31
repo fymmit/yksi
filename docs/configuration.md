@@ -37,8 +37,9 @@ default to empty. Arguments
 are passed directly, without a shell. The agent inherits your environment;
 `env` adds or overrides individual variables. Agents run with your user
 privileges. The client presents permission decisions requested by the agent;
-agent-side tool policies remain in effect. Sign in through the agent's CLI when
-needed; advertised ACP authentication methods are also available in the palette.
+agent-side tool policies remain in effect. Sign in through the agent's CLI in a
+separate terminal when needed; terminal-based authentication is not supported
+inside yksi.
 
 ```sh
 yksi --agent my-agent

@@ -50,7 +50,6 @@ type AppController = Pick<
   | "setConfig"
   | "setMode"
   | "cycleMode"
-  | "authenticate"
   | "exportTranscript"
   | "answer"
 >;
@@ -280,14 +279,6 @@ export function App(props: {
         paths: () => setNotice(`Config: ${appPaths().config} · Data: ${appPaths().data}`),
         quit: props.quit,
       },
-      (state.authMethods ?? [])
-        .filter(method => !("type" in method && method.type === "terminal"))
-        .map(method => ({
-          id: `auth:${method.id}`,
-          label: `Authenticate: ${method.name}`,
-          detail: method.description ?? undefined,
-          run: () => controller.authenticate(method.id),
-        })),
       keys,
     );
   const agentCommands = (): Choice[] =>
