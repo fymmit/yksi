@@ -23,7 +23,7 @@ export function InteractionView(props: {
       if (consumeKey(key)) props.answer();
       return;
     }
-    if (props.interaction.form) {
+    if (props.interaction.kind === "form") {
       if (keys.matches("form.decline", key)) {
         if (consumeKey(key)) props.answer("decline");
       }

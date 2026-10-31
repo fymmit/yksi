@@ -93,7 +93,7 @@ export function App(props: {
   };
   const context = (): KeyContext =>
     state.interaction
-      ? state.interaction.form
+      ? state.interaction.kind === "form"
         ? formContext()
         : "permission"
       : palette()
@@ -401,7 +401,7 @@ export function App(props: {
       return;
     }
     if (
-      !state.interaction?.form &&
+      state.interaction?.kind !== "form" &&
       (keys.matches("app.scrollUp", key) || keys.matches("app.scrollDown", key))
     ) {
       if (consumeKey(key, true)) scroll?.scrollBy(keys.matches("app.scrollUp", key) ? -10 : 10);

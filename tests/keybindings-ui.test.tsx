@@ -274,6 +274,7 @@ test("mode cycling is scoped to the composer and is available as a client comman
       setup.controller.emit("change", {
         ...setup.controller.snapshot(),
         interaction: {
+          kind: form ? "form" : "permission",
           id: "question",
           title: "Confirm?",
           options: [{ id: "yes", name: "Yes" }],
@@ -680,6 +681,7 @@ test("form remaps text controls, confirmation and checkboxes while preserving an
         theme={themes.dark}
         keys={keys}
         interaction={{
+          kind: "form",
           id: "form",
           title: "Questions",
           options: [],
@@ -731,6 +733,7 @@ test("Ctrl+P/N navigate multiline form answers and choice options", async () => 
       <InteractionView
         theme={themes.dark}
         interaction={{
+          kind: "form",
           id: "form",
           title: "Questions",
           options: [],
@@ -781,6 +784,7 @@ test("Ctrl+P/N select permission options", async () => {
         theme={themes.dark}
         interaction={{
           id: "permission",
+          kind: "permission",
           title: "Allow?",
           options: [
             { id: "no", name: "No" },
@@ -820,6 +824,7 @@ test("JSON submission follows configured keys and ignores removed shortcuts", as
         keys={keys}
         interaction={{
           id: "json",
+          kind: "form",
           title: "JSON form",
           options: [],
           form: {
@@ -868,6 +873,7 @@ test("global interrupt keeps busy cancellation semantics and interaction keys st
     setup.controller.emit("change", {
       ...setup.controller.snapshot(),
       interaction: {
+        kind: "permission",
         id: "permission",
         title: "Allow?",
         options: [
@@ -916,6 +922,7 @@ test("a shared app/form shortcut uses the active context and remapped decline pr
     setup.controller.emit("change", {
       ...setup.controller.snapshot(),
       interaction: {
+        kind: "form",
         id: "form",
         title: "Questions",
         options: [],

@@ -123,6 +123,9 @@ from other directories. Bundles require the preload too (see docs/development.md
   model updates and stale setting responses must not overwrite the preference.
 - Resolve pending interaction promises on cancellation/disconnect. An agent's
   permission option IDs and scope labels are authoritative.
+  Interactions discriminate permission, form and URL requests. Internal results
+  distinguish cancellation, permission selection and elicitation actions; accept
+  only offered permission IDs and require content for accepted forms.
 - ACP paths are absolute, line numbers 1-based. Filesystem and command execution
   use the launching user's privileges; honor the agent's permission flow.
 - Agent stdout is reserved for NDJSON; capture stderr to the log. On shutdown,

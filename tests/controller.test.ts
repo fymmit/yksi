@@ -234,6 +234,44 @@ test("structured question decline and cancel outcomes round trip over ACP", asyn
   }
 });
 
+test("interaction kinds keep opaque permission IDs and external URL completion distinct", async () => {
+  const { controller, dispose } = setup();
+  try {
+    await controller.open();
+    const events = Reflect.get(controller.client!, "events") as ClientEvents;
+    const signal = new AbortController().signal;
+    const permission = events.permission(
+      {
+        sessionId: controller.session.remoteId!,
+        toolCall: { toolCallId: "tool", title: "Permission" },
+        options: [{ optionId: "", name: "Allow", kind: "allow_once" }],
+      },
+      signal,
+    );
+    expect(controller.snapshot().interaction?.kind).toBe("permission");
+    controller.answer("invalid");
+    expect(controller.snapshot().interaction).toBeDefined();
+    controller.answer("");
+    expect(await permission).toEqual({ outcome: { outcome: "selected", optionId: "" } });
+    const question = events.question(
+      {
+        mode: "url",
+        sessionId: controller.session.remoteId!,
+        elicitationId: "external",
+        message: "Open browser",
+        url: "https://example.com",
+      },
+      signal,
+    );
+    expect(controller.snapshot().interaction?.kind).toBe("url");
+    events.elicitationComplete?.("external");
+    expect(await question).toEqual({ action: "accept" });
+    expect(controller.snapshot().interaction).toBeUndefined();
+  } finally {
+    dispose();
+  }
+});
+
 test("cancelling a turn resolves all queued forms", async () => {
   const { controller, dispose } = setup();
   controller.config.agents.demo!.args = [resolve(import.meta.dir, "fixtures/agent.ts")];

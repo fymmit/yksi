@@ -486,6 +486,7 @@ test("help suspends permissions and retains form text, choices and JSON drafts",
       ...setup.controller.snapshot(),
       interaction: {
         id: "permission",
+        kind: "permission",
         title: "Allow?",
         options: [
           { id: "no", name: "No" },
@@ -509,6 +510,7 @@ test("help suspends permissions and retains form text, choices and JSON drafts",
       ...setup.controller.snapshot(),
       interaction: {
         id: "form",
+        kind: "form",
         title: "Questions",
         options: [],
         form: {

@@ -11,7 +11,13 @@ async function renderForm(schema: ElicitationSchema, width = 100, height = 35) {
     () => (
       <box width="100%" height="100%">
         <InteractionView
-          interaction={{ id: "form", title: "Build a project", options: [], form: schema }}
+          interaction={{
+            kind: "form",
+            id: "form",
+            title: "Build a project",
+            options: [],
+            form: schema,
+          }}
           theme={themes.dark}
           answer={(id, content) => answers.push({ id, content })}
         />
@@ -627,9 +633,9 @@ test("permission and URL options still return the agent's exact IDs", async () =
       () => (
         <InteractionView
           interaction={{
+            ...(url ? ({ kind: "url", url } as const) : ({ kind: "permission" } as const)),
             id: "interaction",
             title: url ? "Open this URL" : "Permission",
-            url,
             options: [
               { id: "agent:once", name: "Allow once" },
               { id: "agent:never", name: "Deny" },

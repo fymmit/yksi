@@ -10,14 +10,24 @@ import { cleanup } from "./cleanup";
 import { preparePrompt } from "./prompt";
 import { modelOption, optionChoices } from "./session-options";
 
-export type Interaction = {
+type InteractionBase = {
   id: string;
   title: string;
   description?: string;
   options: { id: string; name: string }[];
-  form?: acp.ElicitationSchema;
-  url?: string;
 };
+export type Interaction = InteractionBase &
+  (
+    | { kind: "permission"; form?: never; url?: never }
+    | { kind: "form"; form: acp.ElicitationSchema; url?: never }
+    | { kind: "url"; url: string; form?: never }
+  );
+type InteractionAnswer =
+  | { kind: "cancel" }
+  | { kind: "permission"; optionId: string }
+  | { kind: "form"; action: "accept"; content: Record<string, acp.ElicitationContentValue> }
+  | { kind: "form"; action: "decline" }
+  | { kind: "url"; action: "accept" | "decline" };
 export type Status = "disconnected" | "connecting" | "ready" | "working" | "cancelling" | "history";
 export type Snapshot = {
   session: Session;
@@ -37,7 +47,7 @@ export class Controller extends EventEmitter {
   client?: AgentClient;
   private pending: {
     interaction: Interaction;
-    answer: (id?: string, content?: Record<string, acp.ElicitationContentValue>) => void;
+    answer: (answer: InteractionAnswer) => void;
   }[] = [];
   private terminalOutput: Record<string, string> = {};
   private publishTimer?: ReturnType<typeof setTimeout>;
@@ -68,7 +78,7 @@ export class Controller extends EventEmitter {
       status: this.status,
       error: this.error,
       persistenceError: this.persistenceError,
-      interaction: this.pending[0]?.interaction,
+      interaction: structuredClone(this.pending[0]?.interaction),
       agentName: this.client?.info?.agentInfo?.title ?? this.client?.info?.agentInfo?.name,
       terminalOutput: { ...this.terminalOutput },
       authMethods: structuredClone(this.client?.info?.authMethods ?? []),
@@ -122,23 +132,20 @@ export class Controller extends EventEmitter {
     this.publish(true);
   }
 
-  private ask(
-    interaction: Interaction,
-    signal: AbortSignal,
-  ): Promise<{ id?: string; content?: Record<string, acp.ElicitationContentValue> }> {
+  private ask(interaction: Interaction, signal: AbortSignal): Promise<InteractionAnswer> {
     return new Promise(resolve => {
-      const abort = () => entry.answer();
+      const abort = () => entry.answer({ kind: "cancel" });
       const entry = {
         interaction,
-        answer: (id?: string, content?: Record<string, acp.ElicitationContentValue>) => {
+        answer: (answer: InteractionAnswer) => {
           signal.removeEventListener("abort", abort);
           this.pending = this.pending.filter(item => item !== entry);
-          resolve({ id, content });
+          resolve(answer);
           this.publish(true);
         },
       };
       if (signal.aborted || this.status === "cancelling" || this.closed) {
-        resolve({});
+        resolve({ kind: "cancel" });
         return;
       }
       this.pending.push(entry);
@@ -147,10 +154,21 @@ export class Controller extends EventEmitter {
     });
   }
   answer(id?: string, content?: Record<string, acp.ElicitationContentValue>) {
-    this.pending[0]?.answer(id, content);
+    const pending = this.pending[0];
+    if (!pending) return;
+    const interaction = pending.interaction;
+    if (id === undefined) pending.answer({ kind: "cancel" });
+    else if (!interaction.options.some(option => option.id === id)) return;
+    else if (interaction.kind === "permission")
+      pending.answer({ kind: "permission", optionId: id });
+    else if (interaction.kind === "form") {
+      if (id === "accept" && content !== undefined)
+        pending.answer({ kind: "form", action: "accept", content });
+      else if (id === "decline") pending.answer({ kind: "form", action: "decline" });
+    } else if (id === "accept" || id === "decline") pending.answer({ kind: "url", action: id });
   }
   private dismissInteractions() {
-    for (const item of [...this.pending]) item.answer();
+    for (const item of [...this.pending]) item.answer({ kind: "cancel" });
   }
 
   async open(saved?: Session, agent = this.session.agent) {
@@ -199,6 +217,7 @@ export class Controller extends EventEmitter {
           const result = await this.ask(
             {
               id: crypto.randomUUID(),
+              kind: "permission",
               title: params.toolCall.title ?? "Tool permission",
               description: "Choose the permission scope offered by the agent.",
               options: params.options.map(o => ({ id: o.optionId, name: o.name })),
@@ -206,9 +225,10 @@ export class Controller extends EventEmitter {
             signal,
           );
           return {
-            outcome: result.id
-              ? { outcome: "selected", optionId: result.id }
-              : { outcome: "cancelled" },
+            outcome:
+              result.kind === "permission"
+                ? { outcome: "selected", optionId: result.optionId }
+                : { outcome: "cancelled" },
           };
         },
         question: async (params, signal) => {
@@ -216,6 +236,7 @@ export class Controller extends EventEmitter {
             const result = await this.ask(
               {
                 id: crypto.randomUUID(),
+                kind: "form",
                 title: params.message,
                 form: params.requestedSchema,
                 options: [
@@ -225,14 +246,15 @@ export class Controller extends EventEmitter {
               },
               signal,
             );
-            return result.id === "accept"
+            return result.kind === "form" && result.action === "accept"
               ? { action: "accept", content: result.content }
-              : { action: result.id === "decline" ? "decline" : "cancel" };
+              : { action: result.kind === "form" ? "decline" : "cancel" };
           }
           if (acp.CreateElicitationRequest.isUrl(params)) {
             const result = await this.ask(
               {
                 id: params.elicitationId,
+                kind: "url",
                 title: params.message,
                 url: params.url,
                 options: [
@@ -242,7 +264,7 @@ export class Controller extends EventEmitter {
               },
               signal,
             );
-            return { action: result.id ?? "cancel" };
+            return { action: result.kind === "url" ? result.action : "cancel" };
           }
           return { action: "decline" };
         },
@@ -254,7 +276,9 @@ export class Controller extends EventEmitter {
         },
         elicitationComplete: id => {
           if (generation !== this.generation) return;
-          this.pending.find(item => item.interaction.id === id)?.answer("accept");
+          this.pending
+            .find(item => item.interaction.kind === "url" && item.interaction.id === id)
+            ?.answer({ kind: "url", action: "accept" });
           addMessage(session, "system", "The external interaction completed.");
           this.publish(true);
         },
