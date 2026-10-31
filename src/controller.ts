@@ -1,13 +1,13 @@
 import * as acp from "@agentclientprotocol/sdk";
 import { EventEmitter } from "node:events";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join } from "node:path";
 import type { Config } from "./config";
 import { Storage } from "./storage";
 import { addMessage, applyUpdate, newSession, type Session } from "./state";
 import { AgentClient } from "./acp/client";
 import { sessionMode } from "./modes";
 import { cleanup } from "./cleanup";
+import { preparePrompt } from "./prompt";
 
 export type Interaction = {
   id: string;
@@ -365,7 +365,8 @@ export class Controller extends EventEmitter {
     }
   }
 
-  async send(text: string, attachments: string[] = []) {
+  /** Resolves at turn completion; accepted runs once after local preparation succeeds. */
+  async send(text: string, attachments: string[] = [], accepted?: () => void) {
     if (this.status !== "ready" || !this.session.remoteId || !this.client)
       throw new Error("Connect to an agent before sending a message.");
     if (!text.trim() && !attachments.length) return;
@@ -376,21 +377,12 @@ export class Controller extends EventEmitter {
     this.error = undefined;
     this.publish(true);
     try {
-      const prompt: acp.ContentBlock[] = [{ type: "text", text }];
-      for (const path of attachments) {
-        const absolute = resolve(session.cwd, path);
-        const file = Bun.file(absolute);
-        if (file.size > 1024 * 1024) throw new Error(`Attachment exceeds 1 MiB: ${path}`);
-        const content = await file.text();
-        if (content.includes("\0"))
-          throw new Error(`Only text file attachments are supported: ${path}`);
-        if (client.info?.agentCapabilities?.promptCapabilities?.embeddedContext) {
-          prompt.push({
-            type: "resource",
-            resource: { uri: pathToFileURL(absolute).href, text: content, mimeType: "text/plain" },
-          });
-        } else prompt.push({ type: "text", text: `\nFile: ${absolute}\n${content}` });
-      }
+      const prompt = await preparePrompt(
+        session.cwd,
+        text,
+        attachments,
+        !!client.info?.agentCapabilities?.promptCapabilities?.embeddedContext,
+      );
       if (generation !== this.generation || this.closed || this.status !== "working") return;
       if (!session.items.some(i => i.type === "message" && i.role === "user"))
         session.title = text.trim().split("\n")[0]?.slice(0, 70) || "File discussion";
@@ -402,6 +394,7 @@ export class Controller extends EventEmitter {
       );
       this.persist();
       this.publish(true);
+      accepted?.();
       const result = await client.agent.request(acp.methods.agent.session.prompt, {
         sessionId: session.remoteId!,
         prompt,

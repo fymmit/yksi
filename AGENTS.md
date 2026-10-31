@@ -91,6 +91,9 @@ from other directories. Bundles require the preload too (see docs/development.md
   and cost without inferring subscription allowance or billing accuracy.
 - Client slash commands use `/tui:`; advertised agent commands use `/name`.
   Unknown slash commands must not silently become model prompts.
+  Prompt acceptance follows local attachment preparation and in-memory recording.
+  Clear only the originating, unedited composer draft at acceptance; `send()` still
+  resolves at turn completion. Preparation failures/cancellation preserve the draft.
 - A local transcript is not a resumed agent session. Prefer advertised resume;
   otherwise load and replace history only after replay succeeds. Keep local
   history readable on failure. Never invent a remote session ID or automatically

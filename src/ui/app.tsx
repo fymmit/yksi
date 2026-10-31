@@ -76,6 +76,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   let historyIndex = -1;
   let savedDraft = { text: "", attachments: [] as string[] };
   let replacementText: string | undefined;
+  let draftRevision = 0;
   const drafts = new Map<string, { text: string; attachments: string[] }>();
   const busy = () => ["working", "connecting", "cancelling"].includes(state.status);
   const mode = createMemo(() => sessionMode(state.session));
@@ -87,6 +88,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     }
   };
   const replaceDraft = (text: string) => {
+    draftRevision++;
     replacementText = text;
     editor?.setText(text);
     editor?.gotoBufferEnd();
@@ -360,12 +362,19 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       return;
     }
     const files = attachments();
-    replaceDraft("");
-    setAttachments([]);
-    historyIndex = -1;
-    setNotice("");
-    scroll?.scrollTo(Infinity);
-    run(() => controller.send(text, files));
+    const revision = draftRevision;
+    const sessionId = state.session.id;
+    run(() =>
+      controller.send(text, files, () => {
+        if (state.session.id !== sessionId || draftRevision !== revision || attachments() !== files)
+          return;
+        replaceDraft("");
+        setAttachments([]);
+        historyIndex = -1;
+        setNotice("");
+        scroll?.scrollTo(Infinity);
+      }),
+    );
   };
 
   const runAppAction = (id: KeyAction) => {
@@ -739,6 +748,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
             const text = editor?.plainText ?? "";
             setDraft(text);
             if (text !== replacementText) {
+              draftRevision++;
               replacementText = undefined;
               if (historyIndex !== -1) historyIndex = -1;
             }

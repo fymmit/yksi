@@ -5,6 +5,7 @@ import { configSchema, demoAgent } from "../src/config";
 import { Storage } from "../src/storage";
 import { addMessage } from "../src/state";
 import type { ClientEvents } from "../src/acp/client";
+import * as promptPreparation from "../src/prompt";
 
 function setup() {
   const storage = new Storage(":memory:");
@@ -325,6 +326,46 @@ test("failed attachments are not recorded, successful ones retain their original
     expect(controller.storage.list(controller.cwd)[0]?.inputHistory).toEqual(
       controller.session.inputHistory,
     );
+  } finally {
+    dispose();
+  }
+});
+
+test("acceptance happens before turn completion and cancellation during preparation never accepts", async () => {
+  const { controller, dispose } = setup();
+  try {
+    await controller.open();
+    let accepted = false;
+    const turn = controller.send("/question", [], () => {
+      accepted = true;
+    });
+    while (!controller.snapshot().interaction) await Bun.sleep(5);
+    expect(accepted).toBe(true);
+    expect(controller.status).toBe("working");
+    await controller.cancel();
+    await turn;
+
+    let release!: () => void;
+    const prepare = spyOn(promptPreparation, "preparePrompt").mockImplementation(async () => {
+      await new Promise<void>(resolve => {
+        release = resolve;
+      });
+      return [{ type: "text", text: "never sent" }];
+    });
+    try {
+      accepted = false;
+      const history = structuredClone(controller.session.inputHistory);
+      const cancelled = controller.send("never sent", [], () => {
+        accepted = true;
+      });
+      await controller.cancel();
+      release();
+      await cancelled;
+      expect(accepted).toBe(false);
+      expect(controller.session.inputHistory).toEqual(history);
+    } finally {
+      prepare.mockRestore();
+    }
   } finally {
     dispose();
   }

@@ -279,8 +279,9 @@ test("usage palette preserves the draft at narrow widths and the slash command r
   controller.status = "history";
   controller.error = "Agent cannot resume this transcript";
   const prompts: string[] = [];
-  controller.send = async text => {
+  controller.send = async (text, _attachments, accepted) => {
     prompts.push(text);
+    accepted?.();
   };
   const setup = await testRender(
     () => <App controller={controller} quit={() => {}} autoConnect={false} />,
@@ -332,8 +333,9 @@ test("composer submits the editor buffer when text and Enter arrive together", a
   const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");
   controller.status = "ready";
   const prompts: string[] = [];
-  controller.send = async text => {
+  controller.send = async (text, _attachments, accepted) => {
     prompts.push(text);
+    accepted?.();
   };
   const setup = await testRender(
     () => <App controller={controller} quit={() => {}} autoConnect={false} />,

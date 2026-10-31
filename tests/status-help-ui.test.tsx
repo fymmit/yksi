@@ -19,8 +19,9 @@ async function renderApp(keybindings: KeyOverrides = {}, width = 110) {
   const prompts: string[] = [];
   const answers: unknown[] = [];
   let cancellations = 0;
-  controller.send = async text => {
+  controller.send = async (text, _attachments, accepted) => {
     prompts.push(text);
+    accepted?.();
   };
   controller.answer = (id, content) => {
     answers.push({ id, content });

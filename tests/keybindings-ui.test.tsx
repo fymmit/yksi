@@ -23,9 +23,10 @@ async function renderApp(keybindings: KeyOverrides, leader = "ctrl+x") {
   let quits = 0;
   let cancellations = 0;
   controller.status = "ready";
-  controller.send = async (text, attachments) => {
+  controller.send = async (text, attachments, accepted) => {
     prompts.push(text);
     controller.recordInput(text, attachments);
+    accepted?.();
   };
   controller.cancel = async () => {
     cancellations++;
