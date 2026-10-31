@@ -512,6 +512,13 @@ export class Controller extends EventEmitter {
             this.storage.setSetting(`model:${session.agent}`, confirmed.currentValue);
         }
       },
+      session => {
+        if (model?.id !== configId || model.currentValue !== value) return false;
+        // The advertised value is already confirmed; remember the explicit choice
+        // without reapplying it and potentially resetting agent-dependent settings.
+        this.storage.setSetting(`model:${session.agent}`, model.currentValue);
+        return true;
+      },
     );
   }
   async cycleMode() {
@@ -529,6 +536,7 @@ export class Controller extends EventEmitter {
   private async changeSetting<T>(
     request: (client: AgentClient, session: Session) => Promise<T>,
     apply: (result: T, session: Session) => void,
+    skipRequest?: (session: Session) => boolean,
   ) {
     if (this.status !== "ready" || this.settingRequest)
       throw new Error("Wait for the current operation to finish.");
@@ -537,6 +545,7 @@ export class Controller extends EventEmitter {
     const client = this.client,
       session = this.session,
       generation = this.generation;
+    if (skipRequest?.(session)) return;
     const token = (this.settingRequest = Symbol());
     const current = () =>
       !this.closed && generation === this.generation && this.status !== "disconnected";

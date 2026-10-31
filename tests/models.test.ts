@@ -185,6 +185,109 @@ test("a matching agent default does not send a redundant model change", async ()
   }
 });
 
+for (const remembered of [undefined, "preferred"])
+  test(`selecting the active model skips the request and remembers it: ${remembered ?? "no preference"}`, async () => {
+    const { controller, storage, dispose } = setup();
+    try {
+      await controller.open();
+      if (remembered !== undefined) storage.setSetting("model:test", remembered);
+      await controller.setConfig("engine", "default");
+      expect(model(controller)).toBe("default");
+      expect(storage.setting("model:test", "")).toBe("default");
+      expect(
+        controller.session.configOptions.find(option => option.id === "operation")?.currentValue,
+      ).toBe("0");
+      expect(controller.status).toBe("ready");
+      expect(controller.error).toBeUndefined();
+    } finally {
+      dispose();
+    }
+  });
+
+test("a real model change is sent once and reselecting it skips the request", async () => {
+  const { controller, storage, dispose } = setup();
+  try {
+    await controller.open();
+    await controller.setConfig("engine", "preferred");
+    await controller.setConfig("engine", "preferred");
+    expect(model(controller)).toBe("preferred");
+    expect(storage.setting("model:test", "")).toBe("preferred");
+    expect(
+      controller.session.configOptions.find(option => option.id === "operation")?.currentValue,
+    ).toBe("1");
+  } finally {
+    dispose();
+  }
+});
+
+test("matching non-model settings still send requests", async () => {
+  const { controller, storage, dispose } = setup();
+  try {
+    await controller.open();
+    await controller.setConfig("operation", "0");
+    expect(model(controller)).toBe("other");
+    expect(
+      controller.session.configOptions.find(option => option.id === "operation")?.currentValue,
+    ).toBe("1");
+    expect(storage.setting("model:test", null)).toBeNull();
+  } finally {
+    dispose();
+  }
+});
+
+test("reselecting the active model cannot bypass readiness and connection checks", async () => {
+  const { controller, storage, dispose } = setup();
+  try {
+    await controller.open();
+    controller.status = "working";
+    await expect(controller.setConfig("engine", "default")).rejects.toThrow(
+      "Wait for the current operation to finish.",
+    );
+    controller.status = "disconnected";
+    await expect(controller.setConfig("engine", "default")).rejects.toThrow(
+      "Wait for the current operation to finish.",
+    );
+    controller.status = "ready";
+    controller.session.remoteId = undefined;
+    await expect(controller.setConfig("engine", "default")).rejects.toThrow(
+      "Connect to an agent before changing settings.",
+    );
+    expect(storage.setting("model:test", null)).toBeNull();
+  } finally {
+    dispose();
+  }
+});
+
+test("reselecting the active model cannot bypass a pending setting change", async () => {
+  const { controller, storage, dispose } = setup();
+  const arrived = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let changing: Promise<void> | undefined;
+  try {
+    await controller.open();
+    controller.client!.withTimeout = async <T>(promise: Promise<T>) => {
+      const result = await promise;
+      arrived.resolve();
+      await release.promise;
+      return result;
+    };
+    changing = controller.setConfig("engine", "preferred");
+    await arrived.promise;
+    await expect(controller.setConfig("engine", "default")).rejects.toThrow(
+      "Wait for the current operation to finish.",
+    );
+    expect(storage.setting("model:test", null)).toBeNull();
+    release.resolve();
+    await changing;
+    expect(model(controller)).toBe("preferred");
+    expect(storage.setting("model:test", "")).toBe("preferred");
+  } finally {
+    release.resolve();
+    await changing;
+    dispose();
+  }
+});
+
 test("late successful model choices cannot change a replacement session or its preference", async () => {
   const { controller, storage, dispose } = setup();
   const arrived = Promise.withResolvers<void>();

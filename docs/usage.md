@@ -77,7 +77,9 @@ for that configured agent across projects and restarts. New sessions restore it
 from the agent's advertised model choices; resumed/loaded sessions keep their own
 model. If the choice is unavailable or rejected, the session remains usable and
 a notice explains the fallback. Without an explicit selection, the initial model
-comes from the agent. Ctrl+X, C opens all advertised session settings.
+comes from the agent. Selecting the already-active model remembers that choice
+without sending another model-change request. Ctrl+X, C opens all advertised
+session settings.
 
 ## Commands, usage, and attachments
 

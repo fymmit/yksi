@@ -123,6 +123,9 @@ from other directories. Bundles require the preload too (see docs/development.md
   retain their remote model. Missing/rejected choices produce a notice without
   losing the preference or blocking a usable connection. Agent-initiated/dependent
   model updates and stale setting responses must not overwrite the preference.
+  Explicitly selecting the already-active model remembers its agent-confirmed
+  value without sending a redundant setting request; idle/connected and pending
+  setting checks still apply.
 - Resolve pending interaction promises on cancellation/disconnect. An agent's
   permission option IDs and scope labels are authoritative.
   Interactions discriminate permission, form and URL requests. Internal results
