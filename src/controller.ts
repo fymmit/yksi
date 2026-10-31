@@ -27,6 +27,7 @@ export type Snapshot = {
   persistenceError?: string;
   agentName?: string;
   terminalOutput: Record<string, string>;
+  authMethods?: acp.AuthMethod[];
 };
 
 export class Controller extends EventEmitter {
@@ -70,6 +71,7 @@ export class Controller extends EventEmitter {
       interaction: this.pending[0]?.interaction,
       agentName: this.client?.info?.agentInfo?.title ?? this.client?.info?.agentInfo?.name,
       terminalOutput: { ...this.terminalOutput },
+      authMethods: structuredClone(this.client?.info?.authMethods ?? []),
     };
   }
   private publish(immediate = false) {
@@ -356,6 +358,10 @@ export class Controller extends EventEmitter {
       this.status = saved ? "history" : "disconnected";
       this.report(error);
     }
+  }
+
+  reconnect() {
+    return this.open(this.session.remoteId ? this.session : undefined);
   }
 
   /** Resolves at turn completion; accepted runs once after local preparation succeeds. */

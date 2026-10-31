@@ -34,6 +34,7 @@ async function renderApp(keybindings: KeyOverrides, leader = "ctrl+x") {
   const setup = await testRender(
     () => (
       <App
+        storage={storage}
         controller={controller}
         quit={() => {
           quits++;

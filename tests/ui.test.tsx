@@ -25,7 +25,7 @@ test("keyboard palette preserves the draft, filters and closes; narrow layout ke
   const storage = new Storage(":memory:");
   const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 110, height: 35 },
   );
   try {
@@ -62,7 +62,7 @@ test("reactive streaming and expanded diffs render after initial mount", async (
   const storage = new Storage(":memory:");
   const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 100, height: 35 },
   );
   try {
@@ -105,7 +105,7 @@ test("chat cards align by speaker with timestamps while tools and notices stay b
   const storage = new Storage(":memory:");
   const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 110, height: 35 },
   );
   try {
@@ -207,7 +207,7 @@ test("older transcripts render message cards without inventing timestamps", asyn
     text: "Old prompt",
   });
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 70, height: 20 },
   );
   try {
@@ -226,7 +226,7 @@ test("sidebar cost follows ACP snapshots including zero, missing cost and change
   const storage = new Storage(":memory:");
   const controller = new Controller(configSchema.parse({}), storage, "/project", "copilot");
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 110, height: 35 },
   );
   try {
@@ -284,7 +284,7 @@ test("usage palette preserves the draft at narrow widths and the slash command r
     accepted?.();
   };
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 60, height: 24, kittyKeyboard: true },
   );
   try {
@@ -338,7 +338,7 @@ test("composer submits the editor buffer when text and Enter arrive together", a
     accepted?.();
   };
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 80, height: 24 },
   );
   try {
@@ -364,7 +364,7 @@ test("offline demo form accepts keyboard answers without consuming the composer 
     "demo",
   );
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 80, height: 30, kittyKeyboard: true },
   );
   try {
@@ -421,7 +421,7 @@ test("queued forms reset values and errors while keeping the composer isolated",
     "demo",
   );
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 60, height: 24, kittyKeyboard: true },
   );
   try {

@@ -4,7 +4,7 @@ import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { basename, relative } from "node:path";
 import { Controller, type Snapshot } from "../controller";
-import { changedFiles, type Message } from "../state";
+import { changedFiles } from "../state";
 import { sessionMode } from "../modes";
 import { modelOption, optionChoices, optionValueLabel } from "../session-options";
 import { projectFiles } from "../files";
@@ -26,9 +26,40 @@ import { TimelineEntry } from "./timeline";
 import { formatCost, usageSummary } from "./usage";
 import { StatusBar } from "./status-bar";
 import { KeyboardHelp } from "./help";
+import { createCommands } from "./commands";
+import { createComposerState } from "./composer-state";
+import type { Storage } from "../storage";
 
-export function App(props: { controller: Controller; quit: () => void; autoConnect?: boolean }) {
+type AppController = Pick<
+  Controller,
+  | "config"
+  | "cwd"
+  | "snapshot"
+  | "on"
+  | "off"
+  | "open"
+  | "reconnect"
+  | "send"
+  | "cancel"
+  | "report"
+  | "clearError"
+  | "recordInput"
+  | "setConfig"
+  | "setMode"
+  | "cycleMode"
+  | "authenticate"
+  | "exportTranscript"
+  | "answer"
+>;
+
+export function App(props: {
+  controller: AppController;
+  storage: Pick<Storage, "setting" | "setSetting" | "list">;
+  quit: () => void;
+  autoConnect?: boolean;
+}) {
   const controller = props.controller;
+  const storage = props.storage;
   const keys = resolveKeybindings(controller.config.keybindings, controller.config.leader);
   const hint = keys.hint;
   const renderer = useRenderer();
@@ -36,7 +67,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const [state, setState] = createStore<Snapshot>(controller.snapshot());
   const registry = resolveThemes(controller.config);
   const [themeName, setThemeName] = createSignal(
-    initialTheme(controller.config, controller.storage.setting("theme", "dark"), registry),
+    initialTheme(controller.config, storage.setting("theme", "dark"), registry),
   );
   const theme = () => registry[themeName()]!.theme;
   // Lazily allocate native styles; keep visited styles alive until all consumers unmount.
@@ -46,12 +77,10 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     if (!styles.has(name)) styles.set(name, syntaxStyle(renderer, theme()));
     return styles.get(name)!;
   });
-  const [sidebar, setSidebar] = createSignal(controller.storage.setting("sidebar", true));
+  const [sidebar, setSidebar] = createSignal(storage.setting("sidebar", true));
   const [expanded, setExpanded] = createSignal(false);
   const [thoughts, setThoughts] = createSignal(false);
   const [limit, setLimit] = createSignal(200);
-  const [draft, setDraft] = createSignal("");
-  const [attachments, setAttachments] = createSignal<string[]>([]);
   const [palette, setPalette] = createSignal<{ title: string; choices: Choice[] }>();
   const [help, setHelp] = createSignal<KeyContext>();
   const [formContext, setFormContext] = createSignal<KeyContext>("form.text");
@@ -74,11 +103,11 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
   const [notice, setNotice] = createSignal("");
   let editor: TextareaRenderable | undefined;
   let scroll: ScrollBoxRenderable | undefined;
-  let historyIndex = -1;
-  let savedDraft = { text: "", attachments: [] as string[] };
-  let replacementText: string | undefined;
-  let draftRevision = 0;
-  const drafts = new Map<string, { text: string; attachments: string[] }>();
+  const composer = createComposerState(
+    () => state.session,
+    () => editor,
+  );
+  const { draft, attachments, setAttachments, replaceDraft } = composer;
   const busy = () => ["working", "connecting", "cancelling"].includes(state.status);
   const mode = createMemo(() => sessionMode(state.session));
   const run = (action: () => unknown) => {
@@ -88,26 +117,12 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       controller.report(error);
     }
   };
-  const replaceDraft = (text: string) => {
-    draftRevision++;
-    replacementText = text;
-    editor?.setText(text);
-    editor?.gotoBufferEnd();
-    setDraft(text);
-  };
   const listener = (snapshot: Snapshot) => {
     const previousId = state.session.id;
     if (previousId !== snapshot.session.id) {
       clearPrefix();
       setNotice("");
-      drafts.set(
-        previousId,
-        historyIndex === -1 ? { text: draft(), attachments: attachments() } : savedDraft,
-      );
-      const saved = drafts.get(snapshot.session.id);
-      replaceDraft(saved?.text ?? "");
-      setAttachments(saved?.attachments ?? []);
-      historyIndex = -1;
+      composer.switchSession(previousId, snapshot.session.id);
       setLimit(200);
     }
     if (snapshot.interaction) {
@@ -138,7 +153,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     });
   const showSessions = () => {
     const issues: string[] = [];
-    const sessions = controller.storage.list(controller.cwd, issue => issues.push(issue.id));
+    const sessions = storage.list(controller.cwd, issue => issues.push(issue.id));
     if (issues.length)
       setNotice(
         `Could not read ${issues.length} saved session(s): ${issues.join(", ")}. Records remain in the history database.`,
@@ -163,8 +178,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
         id: path,
         label: path,
         run: () => {
-          historyIndex = -1;
-          setAttachments(previous => [...new Set([...previous, path])]);
+          setAttachments([...new Set([...attachments(), path])]);
           if (draft() === "@") replaceDraft("");
         },
       })),
@@ -214,7 +228,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     });
   const toggleSidebar = () => {
     setSidebar(value => !value);
-    controller.storage.setSetting("sidebar", sidebar());
+    storage.setSetting("sidebar", sidebar());
   };
   const showThemes = () =>
     setPalette({
@@ -231,72 +245,39 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           .join(" · "),
         run: () => {
           setThemeName(id);
-          controller.storage.setSetting("theme", id);
+          storage.setSetting("theme", id);
         },
       })),
     });
-  const clientCommands = (): Choice[] =>
-    [
-      { id: "help", label: "Keyboard shortcuts", run: showHelp },
-      { id: "new", label: "New session", run: () => controller.open() },
-      { id: "sessions", label: "Switch session", run: showSessions },
-      { id: "agents", label: "Switch agent", run: showAgents },
+  const clientCommands = () =>
+    createCommands(
       {
-        id: "config",
-        label: "Model, mode and agent settings",
-        detail: "advertised by the agent",
-        run: showConfig,
-      },
-      { id: "model", label: "Choose model", run: showModel },
-      {
-        id: "cycle-mode",
-        label: "Cycle mode",
-        detail: "next agent mode",
-        run: () => controller.cycleMode(),
-      },
-      {
-        id: "usage",
-        label: "Show session usage",
-        detail: "last reported cost and context",
-        run: () => {
+        help: showHelp,
+        new: () => controller.open(),
+        sessions: showSessions,
+        agents: showAgents,
+        config: showConfig,
+        model: showModel,
+        "cycle-mode": () => controller.cycleMode(),
+        usage: () => {
           controller.clearError();
           setNotice(usageSummary(state.session));
         },
-      },
-      { id: "files", label: "Attach file", run: showFiles },
-      {
-        id: "clear-attachments",
-        label: "Clear attachments",
-        run: () => {
-          historyIndex = -1;
+        files: showFiles,
+        "clear-attachments": () => {
           setAttachments([]);
         },
+        reconnect: () => controller.reconnect(),
+        sidebar: toggleSidebar,
+        tools: () => setExpanded(value => !value),
+        thoughts: () => setThoughts(value => !value),
+        theme: showThemes,
+        earlier: () => setLimit(value => value + 200),
+        export: async () => setNotice(`Exported ${await controller.exportTranscript()}`),
+        paths: () => setNotice(`Config: ${appPaths().config} · Data: ${appPaths().data}`),
+        quit: props.quit,
       },
-      {
-        id: "reconnect",
-        label: "Reconnect current session",
-        run: () => controller.open(state.session.remoteId ? controller.session : undefined),
-      },
-      { id: "sidebar", label: "Toggle sidebar", run: toggleSidebar },
-      {
-        id: "tools",
-        label: "Expand / collapse tool details",
-        run: () => setExpanded(value => !value),
-      },
-      { id: "thoughts", label: "Show / hide reasoning", run: () => setThoughts(value => !value) },
-      { id: "theme", label: "Choose theme", run: showThemes },
-      { id: "earlier", label: "Show earlier messages", run: () => setLimit(value => value + 200) },
-      {
-        id: "export",
-        label: "Export transcript to Markdown",
-        run: async () => setNotice(`Exported ${await controller.exportTranscript()}`),
-      },
-      {
-        id: "paths",
-        label: "Show configuration and data paths",
-        run: () => setNotice(`Config: ${appPaths().config} · Data: ${appPaths().data}`),
-      },
-      ...(controller.client?.info?.authMethods ?? [])
+      (state.authMethods ?? [])
         .filter(method => !("type" in method && method.type === "terminal"))
         .map(method => ({
           id: `auth:${method.id}`,
@@ -304,15 +285,8 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           detail: method.description ?? undefined,
           run: () => controller.authenticate(method.id),
         })),
-      { id: "quit", label: "Quit", run: props.quit },
-    ].map(command => {
-      const id = `app.${command.id}` as KeyAction;
-      const shortcut = Object.hasOwn(keys.bindings, id) ? keys.label(id) : "";
-      return {
-        ...command,
-        detail: [shortcut, command.detail].filter(Boolean).join(" · ") || undefined,
-      };
-    });
+      keys,
+    );
   const agentCommands = (): Choice[] =>
     state.session.commands.map(command => ({
       id: `agent:${command.name}`,
@@ -346,7 +320,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       }
       controller.recordInput(text);
       replaceDraft("");
-      historyIndex = -1;
+      composer.resetHistory();
       run(command.run);
       return;
     }
@@ -367,16 +341,10 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       );
       return;
     }
-    const files = attachments();
-    const revision = draftRevision;
-    const sessionId = state.session.id;
+    const submission = composer.capture();
     run(() =>
-      controller.send(text, files, () => {
-        if (state.session.id !== sessionId || draftRevision !== revision || attachments() !== files)
-          return;
-        replaceDraft("");
-        setAttachments([]);
-        historyIndex = -1;
+      controller.send(text, submission.attachments, () => {
+        if (!composer.accept(submission)) return;
         setNotice("");
         scroll?.scrollTo(Infinity);
       }),
@@ -387,7 +355,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
     if (id === "app.commands") showCommands();
     else if (id === "app.tools") setExpanded(value => !value);
     else {
-      const command = clientCommands().find(command => `app.${command.id}` === id);
+      const command = clientCommands().find(command => command.action === id);
       if (command) run(command.run);
     }
   };
@@ -455,10 +423,9 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
       if (consumeKey(key)) runAppAction("app.commands");
       return;
     }
-    const command = clientCommands().find(command => {
-      const id = `app.${command.id}` as KeyAction;
-      return Object.hasOwn(keys.bindings, id) && keys.matches(id, key);
-    });
+    const command = clientCommands().find(
+      command => command.action && keys.matches(command.action, key),
+    );
     if (command) {
       if (consumeKey(key)) run(command.run);
       return;
@@ -505,23 +472,9 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
           previous ? editor?.moveCursorUp() : editor?.moveCursorDown();
         return;
       }
-      const history =
-        state.session.inputHistory ??
-        state.session.items
-          .filter((item): item is Message => item.type === "message" && item.role === "user")
-          .map(item => ({ text: item.text, attachments: [] as string[] }));
-      const next = Math.max(-1, Math.min(history.length - 1, historyIndex + (previous ? 1 : -1)));
-      if (next === historyIndex) {
+      if (!composer.browse(previous, () => consumeKey(key, true))) {
         if (key.name !== (previous ? "up" : "down")) consumeKey(key, true);
-        return;
       }
-      if (!consumeKey(key, true)) return;
-      if (historyIndex === -1)
-        savedDraft = { text: editor?.plainText ?? draft(), attachments: attachments() };
-      historyIndex = next;
-      const entry = next === -1 ? savedDraft : history[history.length - 1 - next]!;
-      replaceDraft(entry.text);
-      setAttachments([...entry.attachments]);
       return;
     }
     suppressEditorFallback(key);
@@ -753,15 +706,7 @@ export function App(props: { controller: Controller; quit: () => void; autoConne
               : `Ask anything · / commands · @ then ${hint("composer.complete", "to attach a file")}`
           }
           {...editorColors(theme())}
-          onContentChange={() => {
-            const text = editor?.plainText ?? "";
-            setDraft(text);
-            if (text !== replacementText) {
-              draftRevision++;
-              replacementText = undefined;
-              if (historyIndex !== -1) historyIndex = -1;
-            }
-          }}
+          onContentChange={composer.contentChanged}
         />
         <Show when={completions().length}>
           <text {...selectionColors(theme())} fg={theme().muted} maxHeight={1}>

@@ -21,7 +21,7 @@ test("attachment rejection preserves composer text and selection", async () => {
   );
   await controller.open();
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 100, height: 30 },
   );
   try {
@@ -82,7 +82,7 @@ test("delayed acceptance preserves edits made during preparation", async () => {
     return [{ type: "text", text: "/question" }];
   });
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 80, height: 30 },
   );
   try {

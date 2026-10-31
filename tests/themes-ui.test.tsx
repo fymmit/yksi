@@ -83,7 +83,7 @@ test("theme picker applies custom UI, syntax, Markdown and diff colors to existi
     content: [{ type: "diff", path: "/project/a.txt", oldText: "before\n", newText: "after\n" }],
   });
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 110, height: 50, kittyKeyboard: true },
   );
   try {
@@ -170,7 +170,7 @@ test("slash picker stays local, help preserves filtering, and persisted themes s
   const config = configSchema.parse({});
   const controller = new Controller(config, storage, "/project", "copilot");
   let setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width: 65, height: 28, kittyKeyboard: true },
   );
   try {
@@ -191,7 +191,7 @@ test("slash picker stays local, help preserves filtering, and persisted themes s
     expect(hasColor(setup, "yksi", themePresets["gruvbox-light"].theme.accent)).toBe(true);
     await setup.dispose();
     setup = await testRender(
-      () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+      () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
       { width: 65, height: 28, kittyKeyboard: true },
     );
     await setup.renderOnce();
@@ -199,7 +199,7 @@ test("slash picker stays local, help preserves filtering, and persisted themes s
     await setup.dispose();
     controller.config.theme = "github-dark";
     setup = await testRender(
-      () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+      () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
       { width: 65, height: 28, kittyKeyboard: true },
     );
     await setup.renderOnce();

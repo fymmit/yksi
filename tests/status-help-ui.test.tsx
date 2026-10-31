@@ -30,7 +30,7 @@ async function renderApp(keybindings: KeyOverrides = {}, width = 110) {
     cancellations++;
   };
   const setup = await testRender(
-    () => <App controller={controller} quit={() => {}} autoConnect={false} />,
+    () => <App controller={controller} storage={storage} quit={() => {}} autoConnect={false} />,
     { width, height: 35, kittyKeyboard: true },
   );
   await setup.renderOnce();

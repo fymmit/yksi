@@ -98,7 +98,7 @@ Customize shortcuts with keybindings in your configuration file.`);
       renderer.destroy();
       return;
     }
-    await render(() => <App controller={controller} quit={quit} />, renderer);
+    await render(() => <App controller={controller} storage={storage} quit={quit} />, renderer);
     await renderer.closed;
   } finally {
     quit();

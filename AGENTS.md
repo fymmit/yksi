@@ -57,6 +57,10 @@ from other directories. Bundles require the preload too (see docs/development.md
   retained; settings have a typed, runtime-validated key/value contract. Database
   initialization respects `user_version` and rejects unsupported newer versions.
 - `src/ui/`: Solid components, palette, composer, tool/diff rendering and themes.
+  `composer-state.ts` owns per-session drafts, attachments and history navigation;
+  `commands.ts` constructs executable local commands with explicit key-action IDs.
+  `App` receives a narrow controller command/snapshot interface and a separate
+  typed storage dependency for UI preferences and history browsing.
   `timeline.tsx` renders left-aligned assistant and right-aligned user message cards;
   `message-time.ts` formats local message times, with full dates outside today.
   Reasoning, system notices and tools stay outside message cards. Old saved
@@ -136,7 +140,9 @@ from other directories. Bundles require the preload too (see docs/development.md
   config wins again on restart. All UI, input/selection, scrollbar, Markdown,
   syntax and diff colors come from resolved tokens. Native syntax styles are
   allocated lazily per visited theme and destroyed on app cleanup.
-- Keybindings are startup-loaded overrides in that configuration: omitted actions
+- Keybindings are startup-loaded overrides in that configuration. Action metadata
+  (description, contexts, defaults and sequence support) lives in one registry.
+  Omitted bindings
   inherit defaults, arrays replace shortcuts, and `[]` disables them. Contexts
   permit key reuse only where actions cannot overlap. Keep handlers and hints
   sourced from `src/keybindings.ts`; inline hints use the first alternative and
