@@ -28,6 +28,14 @@ extension metadata and legacy optional fields. Invalid rows stay in SQLite and t
 session picker reports skipped records. Settings are validated against their key's
 value type. Databases newer than this client's supported schema are rejected.
 
+Snapshot publication and history persistence are independent. Durable session
+mutations mark a session dirty; UI errors and interaction queue changes do not.
+Successful writes clear dirtiness, and session replacement/shutdown flush pending
+sessions. Run `bun scripts/benchmark-session.ts` to measure snapshot cloning,
+serialization plus in-memory SQLite writes, and late tool patches at 1k/10k/50k
+timeline items. It reports medians and p95s; real disk and rendering costs are
+outside this diagnostic. Use measurements before changing snapshot or lookup design.
+
 ## Formatting and commit hooks
 
 Biome formats JavaScript/TypeScript (including TSX), JSON/JSONC, Markdown, and

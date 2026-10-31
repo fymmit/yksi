@@ -64,6 +64,8 @@ test("disposal removes listeners and dismisses interactions even when final savi
   );
   const turn = controller.send("/question");
   await asked;
+  const events = Reflect.get(controller.client!, "events") as ClientEvents;
+  events.terminal("shutdown-output", "pending save");
   const failing = spyOn(controller.storage, "save").mockImplementation(() => {
     throw new Error("disk full");
   });
@@ -95,6 +97,55 @@ test("an unused remote session is not saved while open, on switch, or on exit", 
 
     controller.dispose();
     expect(controller.storage.list(controller.cwd)).toEqual([]);
+  } finally {
+    dispose();
+  }
+});
+
+test("only durable mutations schedule history writes and successful flushes stay clean", async () => {
+  const { controller, dispose } = setup();
+  try {
+    await controller.open();
+    await controller.send("/help");
+    const save = spyOn(controller.storage, "save");
+    try {
+      controller.report("UI error");
+      controller.clearError();
+      const events = Reflect.get(controller.client!, "events") as ClientEvents;
+      const abort = new AbortController();
+      const question = events.question(
+        {
+          sessionId: controller.session.remoteId!,
+          mode: "url",
+          elicitationId: "url",
+          message: "Open",
+          url: "https://example.com",
+        },
+        abort.signal,
+      );
+      abort.abort();
+      await question;
+      await Bun.sleep(550);
+      expect(save).not.toHaveBeenCalled();
+      events.terminal("terminal", "output");
+      events.update({
+        sessionId: controller.session.remoteId!,
+        update: { sessionUpdate: "usage_update", used: 12, size: 100 },
+      });
+      await Bun.sleep(550);
+      expect(save).toHaveBeenCalledTimes(1);
+      const saved = controller.storage.list(controller.cwd)[0]!;
+      expect(saved.terminalOutput).toEqual({ terminal: "output" });
+      expect(saved.usage?.used).toBe(12);
+      await controller.setMode("plan");
+      controller.dispose();
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(controller.storage.list(controller.cwd)[0]?.modes?.currentModeId).toBe("plan");
+      controller.dispose();
+      expect(save).toHaveBeenCalledTimes(2);
+    } finally {
+      save.mockRestore();
+    }
   } finally {
     dispose();
   }

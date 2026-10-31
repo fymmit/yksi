@@ -135,6 +135,8 @@ from other directories. Bundles require the preload too (see docs/development.md
   Attempt every cleanup even if another fails. History write failures are recoverable:
   expose a separate persistence error, retain unsaved sessions across switches, and
   retry at the next normal save opportunity without a reporting/retry loop.
+  Publication does not schedule persistence: durable mutations mark sessions dirty,
+  successful writes clear them, and switching/shutdown flush pending writes.
 - UI state/settings are local. Do not automatically execute project-local agent
   configuration. The only configuration is the global file or explicit --config.
 - Themes are startup-loaded global config: `theme` selects an explicit startup

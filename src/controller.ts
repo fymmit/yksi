@@ -10,6 +10,10 @@ import { cleanup } from "./cleanup";
 import { preparePrompt } from "./prompt";
 import { modelOption, optionChoices } from "./session-options";
 
+const SNAPSHOT_INTERVAL_MS = 32;
+const SAVE_INTERVAL_MS = 500;
+const CANCEL_TIMEOUT_MS = 5000;
+
 type InteractionBase = {
   id: string;
   title: string;
@@ -90,16 +94,21 @@ export class Controller extends EventEmitter {
       clearTimeout(this.publishTimer);
       this.publishTimer = undefined;
       this.emit("change", this.snapshot());
-    } else if (!this.publishTimer) this.publishTimer = setTimeout(() => this.publish(true), 32);
-    if (!this.saveTimer)
+    } else if (!this.publishTimer)
+      this.publishTimer = setTimeout(() => this.publish(true), SNAPSHOT_INTERVAL_MS);
+  }
+  private markDirty(session = this.session) {
+    if (session.items.some(item => item.type === "tool" || item.role !== "system"))
+      this.unsaved.set(session.id, session);
+    if (!this.closed && this.unsaved.size && !this.saveTimer)
       this.saveTimer = setTimeout(() => {
         this.saveTimer = undefined;
         this.persist();
-      }, 500);
+      }, SAVE_INTERVAL_MS);
   }
   private persist() {
-    if (this.session.items.some(item => item.type === "tool" || item.role !== "system"))
-      this.unsaved.set(this.session.id, this.session);
+    clearTimeout(this.saveTimer);
+    this.saveTimer = undefined;
     const previousError = this.persistenceError;
     this.persistenceError = undefined;
     for (const [id, session] of this.unsaved) {
@@ -128,6 +137,7 @@ export class Controller extends EventEmitter {
     );
     this.session.inputHistory.push({ text, attachments: [...attachments] });
     this.session.updatedAt = Date.now();
+    this.markDirty();
     this.persist();
     this.publish(true);
   }
@@ -174,6 +184,7 @@ export class Controller extends EventEmitter {
   async open(saved?: Session, agent = this.session.agent) {
     if (this.closed) return;
     if (this.busy) throw new Error("Cancel the current operation before changing sessions.");
+    if (saved) saved = this.unsaved.get(saved.id) ?? saved;
     const definition = this.config.agents[saved?.agent ?? agent];
     if (!definition) throw new Error(`Agent is not configured: ${saved?.agent ?? agent}`);
     this.persist();
@@ -189,6 +200,7 @@ export class Controller extends EventEmitter {
     this.session.commands = [];
     this.session.configOptions = [];
     this.session.modes = undefined;
+    this.markDirty();
     this.terminalOutput = this.session.terminalOutput ?? {};
     this.status = "connecting";
     this.error = undefined;
@@ -207,13 +219,17 @@ export class Controller extends EventEmitter {
           )
             return;
           if (replay) replay.push({ update: notification.update, receivedAt: Date.now() });
-          else applyUpdate(session, notification.update);
+          else {
+            applyUpdate(session, notification.update);
+            this.markDirty(session);
+          }
           this.publish();
         },
         permission: async (params, signal) => {
           if (session.remoteId && params.sessionId !== session.remoteId)
             return { outcome: { outcome: "cancelled" } };
           applyUpdate(session, { ...params.toolCall, sessionUpdate: "tool_call_update" });
+          this.markDirty(session);
           const result = await this.ask(
             {
               id: crypto.randomUUID(),
@@ -272,6 +288,7 @@ export class Controller extends EventEmitter {
           if (generation !== this.generation) return;
           this.terminalOutput[id] = output;
           session.terminalOutput = this.terminalOutput;
+          this.markDirty(session);
           this.publish();
         },
         elicitationComplete: id => {
@@ -280,6 +297,7 @@ export class Controller extends EventEmitter {
             .find(item => item.interaction.kind === "url" && item.interaction.id === id)
             ?.answer({ kind: "url", action: "accept" });
           addMessage(session, "system", "The external interaction completed.");
+          this.markDirty(session);
           this.publish(true);
         },
         disconnected: message => {
@@ -374,6 +392,7 @@ export class Controller extends EventEmitter {
       }
       if (!current()) return;
       this.status = "ready";
+      this.markDirty(session);
       this.persist();
       this.publish(true);
     } catch (error) {
@@ -415,6 +434,7 @@ export class Controller extends EventEmitter {
         "user",
         text + (attachments.length ? `\n\nAttached: ${attachments.join(", ")}` : ""),
       );
+      this.markDirty(session);
       this.persist();
       this.publish(true);
       accepted?.();
@@ -423,8 +443,10 @@ export class Controller extends EventEmitter {
         prompt,
       });
       if (generation !== this.generation || this.closed) return;
-      if (result.stopReason !== "end_turn")
+      if (result.stopReason !== "end_turn") {
         addMessage(session, "system", `Turn stopped: ${result.stopReason}`);
+        this.markDirty(session);
+      }
     } catch (error) {
       if (generation === this.generation && !this.closed) this.report(error);
     } finally {
@@ -454,7 +476,7 @@ export class Controller extends EventEmitter {
       this.client?.dispose();
       this.status = "disconnected";
       this.report("Agent did not finish cancellation within 5 seconds; disconnected.");
-    }, 5000);
+    }, CANCEL_TIMEOUT_MS);
     await this.client.agent.notify(acp.methods.agent.session.cancel, {
       sessionId: this.session.remoteId!,
     });
@@ -523,7 +545,11 @@ export class Controller extends EventEmitter {
     try {
       const result = await client.withTimeout(request(client, session));
       if (!current()) return;
-      apply(result, session);
+      try {
+        apply(result, session);
+      } finally {
+        this.markDirty(session);
+      }
       this.publish(true);
     } catch (error) {
       if (current()) throw error;
